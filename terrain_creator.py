@@ -6,13 +6,20 @@ weather_conditions = ['Clear', 'Rain', 'Fog', 'Snow']
 time_of_day = ['Day', 'Night', 'Dawn', 'Dusk']
 
 def generate_height_map(width, height, scale):
-    noise = PerlinNoise(octaves=4, seed=1)
+    noise = PerlinNoise(octaves=2, seed=1)  # Reduced octaves for smoother terrain
     height_map = np.zeros((height, width))
     for i in range(height):
         for j in range(width):
-            x = i / (scale * 5)  # Adjusted scale for more detail
-            y = j / (scale * 5)
-            height_map[i][j] = noise([x, y])
+            x = i / scale
+            y = j / scale
+            elevation = noise([x, y])
+            height_map[i][j] = elevation
+    # Scale the elevation to realistic values in feet
+    min_elevation = 0    # Sea level
+    max_elevation = 500  # Maximum elevation in feet
+    # Normalize height_map to range between min_elevation and max_elevation
+    height_map = (height_map - height_map.min()) / (height_map.max() - height_map.min())
+    height_map = height_map * (max_elevation - min_elevation) + min_elevation
     return height_map
 
 def assign_terrain_types(height_map):
@@ -20,28 +27,34 @@ def assign_terrain_types(height_map):
     for i in range(height_map.shape[0]):
         for j in range(height_map.shape[1]):
             elevation = height_map[i][j]
-            if elevation < -0.05:
+            if elevation < 1:
                 terrain_map[i][j] = 'Water'
-            elif elevation < 0.0:
+            elif elevation < 5:
                 terrain_map[i][j] = 'Sand'
-            elif elevation < 0.3:
+            elif elevation < 100:
                 terrain_map[i][j] = 'Grass'
-            elif elevation < 0.6:
+            elif elevation < 300:
                 terrain_map[i][j] = 'Forest'
             else:
                 terrain_map[i][j] = 'Mountain'
     return terrain_map
 
-def calculate_visibility(viewer_height_ft, square_size_miles):
+
+def calculate_visibility(viewer_height_ft, observer_elevation_ft, square_size_miles):
+    # Total viewer height is the sum of observer elevation and viewer height
+    total_height_ft = viewer_height_ft + observer_elevation_ft
     # Horizon distance in miles: d = 1.22 * sqrt(h), where h is in feet
-    horizon_distance_miles = 1.22 * np.sqrt(viewer_height_ft)
+    horizon_distance_miles = 1.22 * np.sqrt(total_height_ft)
     # Convert horizon distance to number of squares
     visibility_range = int(horizon_distance_miles / square_size_miles)
     return visibility_range
 
 
-def get_visible_cells(player_x, player_y, visibility_range, map_width, map_height):
+def get_visible_cells(player_x, player_y, visibility_range, map_width, map_height, height_map):
     visible_cells = []
+    observer_elevation_ft = height_map[player_x][player_y]
+    viewer_height_ft = 6  # Height of the viewer in feet
+
     for i in range(player_x - visibility_range, player_x + visibility_range + 1):
         for j in range(player_y - visibility_range, player_y + visibility_range + 1):
             if 0 <= i < map_width and 0 <= j < map_height:
@@ -49,8 +62,13 @@ def get_visible_cells(player_x, player_y, visibility_range, map_width, map_heigh
                 dy = player_y - j
                 distance = np.sqrt(dx * dx + dy * dy)
                 if distance <= visibility_range:
-                    visible_cells.append((i, j))
+                    # Adjust visibility based on elevation difference
+                    target_elevation_ft = height_map[i][j]
+                    elevation_diff = target_elevation_ft - observer_elevation_ft
+                    if elevation_diff <= 0 or distance <= calculate_visibility(viewer_height_ft, target_elevation_ft, 0.1):
+                        visible_cells.append((i, j))
     return visible_cells
+
 
 
 def get_weather():

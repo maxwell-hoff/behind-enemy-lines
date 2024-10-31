@@ -29,11 +29,12 @@ def game_state():
     player_y = player_state['y']
     viewer_height_ft = 6  # Height of the viewer in feet
     square_size_miles = 0.1  # Size of each square in miles
+    observer_elevation_ft = height_map[player_x][player_y]  # Player's elevation in feet
 
-    # Calculate visibility range based on viewer's height
-    visibility_range = calculate_visibility(viewer_height_ft, square_size_miles)
+    # Calculate visibility range based on viewer's height and elevation
+    visibility_range = calculate_visibility(viewer_height_ft, observer_elevation_ft, square_size_miles)
 
-    visible_cells_coords = get_visible_cells(player_x, player_y, visibility_range, map_width, map_height)
+    visible_cells_coords = get_visible_cells(player_x, player_y, visibility_range, map_width, map_height, height_map)
 
     # Collect data for the visible cells
     visible_terrain = []
