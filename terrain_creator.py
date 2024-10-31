@@ -42,6 +42,7 @@ def get_visible_cells(player_x, player_y, visibility_range, map_width, map_heigh
     for i in range(player_x - visibility_range, player_x + visibility_range + 1):
         for j in range(player_y - visibility_range, player_y + visibility_range + 1):
             if 0 <= i < map_width and 0 <= j < map_height:
+                # Calculate distance based on actual grid distance
                 distance = max(abs(player_x - i), abs(player_y - j))
                 if distance <= visibility_range:
                     visible_cells.append((i, j))
