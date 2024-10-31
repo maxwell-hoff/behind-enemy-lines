@@ -6,9 +6,14 @@ function updateGameState() {
         const grid = document.getElementById('grid');
         grid.innerHTML = '';
 
-        // Determine the grid size (e.g., 15x15)
-        const gridSize = 15; // Must be an odd number to center on player
+        // Get visibility range from the server
+        const visibilityRange = data.visibility_range;
+        const gridSize = visibilityRange * 2 + 1;
         const halfGrid = Math.floor(gridSize / 2);
+
+        // Update grid style to match the new grid size
+        grid.style.gridTemplateColumns = `repeat(${gridSize}, 10px)`;
+        grid.style.gridTemplateRows = `repeat(${gridSize}, 10px)`;
 
         // Get player position
         const playerX = data.player_position.x;
@@ -17,8 +22,8 @@ function updateGameState() {
         // Create cells
         for (let row = -halfGrid; row <= halfGrid; row++) {
             for (let col = -halfGrid; col <= halfGrid; col++) {
-                const cellX = playerX + col;  // Swapped col and row
-                const cellY = playerY + row;  // Swapped col and row
+                const cellX = playerX + col;
+                const cellY = playerY + row;
                 const cell = document.createElement('div');
                 cell.classList.add('cell');
 
@@ -28,8 +33,7 @@ function updateGameState() {
                     cell.classList.add(visibleCell.terrain);
                     cell.title = `Terrain: ${visibleCell.terrain}\nElevation: ${visibleCell.elevation.toFixed(2)}`;
                 } else {
-                    // Cell is not visible
-                    cell.style.visibility = 'hidden'; // Use visibility instead of display
+                    cell.style.visibility = 'hidden';
                 }
 
                 // Mark previous positions

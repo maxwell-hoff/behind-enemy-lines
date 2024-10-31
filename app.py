@@ -5,8 +5,8 @@ import os
 app = Flask(__name__)
 
 # Global game state (for demonstration purposes)
-map_width = 500
-map_height = 500
+map_width = 300
+map_height = 300
 height_map = generate_height_map(map_width, map_height, scale=20)
 terrain_map = assign_terrain_types(height_map)
 
@@ -27,10 +27,14 @@ def index():
 def game_state():
     player_x = player_state['x']
     player_y = player_state['y']
-    elevation = height_map[player_x][player_y]
-    visibility_range = calculate_visibility(elevation)
-    visible_cells_coords = get_visible_cells(player_x, player_y, visibility_range, map_width, map_height, terrain_map, height_map)
-    
+    viewer_height_ft = 6  # Height of the viewer in feet
+    square_size_miles = 0.1  # Size of each square in miles
+
+    # Calculate visibility range based on viewer's height
+    visibility_range = calculate_visibility(viewer_height_ft, square_size_miles)
+
+    visible_cells_coords = get_visible_cells(player_x, player_y, visibility_range, map_width, map_height)
+
     # Collect data for the visible cells
     visible_terrain = []
     for cell in visible_cells_coords:
@@ -66,7 +70,8 @@ def game_state():
         'signal_strength': signal_strength,
         'sounds': sounds,
         'enemies_in_sight': enemies_in_sight,
-        'previous_positions': player_state['previous_positions']
+        'previous_positions': player_state['previous_positions'],
+        'visibility_range': visibility_range  # Include visibility range in the response
     }
     response = make_response(jsonify(response))
     response.headers['Cache-Control'] = 'no-store'

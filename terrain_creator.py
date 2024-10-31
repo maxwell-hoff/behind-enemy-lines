@@ -32,12 +32,15 @@ def assign_terrain_types(height_map):
                 terrain_map[i][j] = 'Mountain'
     return terrain_map
 
-def calculate_visibility(elevation):
-    base_visibility = 3  # Base number of squares visible
-    additional_visibility = int(elevation * 10)  # Increase visibility with elevation
-    return base_visibility + additional_visibility
+def calculate_visibility(viewer_height_ft, square_size_miles):
+    # Horizon distance in miles: d = 1.22 * sqrt(h), where h is in feet
+    horizon_distance_miles = 1.22 * np.sqrt(viewer_height_ft)
+    # Convert horizon distance to number of squares
+    visibility_range = int(horizon_distance_miles / square_size_miles)
+    return visibility_range
 
-def get_visible_cells(player_x, player_y, visibility_range, map_width, map_height, terrain_map, height_map):
+
+def get_visible_cells(player_x, player_y, visibility_range, map_width, map_height):
     visible_cells = []
     for i in range(player_x - visibility_range, player_x + visibility_range + 1):
         for j in range(player_y - visibility_range, player_y + visibility_range + 1):
@@ -46,7 +49,6 @@ def get_visible_cells(player_x, player_y, visibility_range, map_width, map_heigh
                 dy = player_y - j
                 distance = np.sqrt(dx * dx + dy * dy)
                 if distance <= visibility_range:
-                    # Optionally perform line-of-sight checks here
                     visible_cells.append((i, j))
     return visible_cells
 
