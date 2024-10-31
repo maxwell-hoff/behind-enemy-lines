@@ -1,5 +1,6 @@
 from flask import Flask, render_template, jsonify, request
 from terrain_creator import *
+import os
 
 app = Flask(__name__)
 
@@ -92,4 +93,5 @@ def move():
     return jsonify({'status': 'moved'})
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    port = int(os.environ.get('PORT', 5000))  # Use port from environment variable or default to 5000
+    app.run(debug=True, host='0.0.0.0', port=port)
