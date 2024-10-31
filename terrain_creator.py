@@ -37,16 +37,32 @@ def calculate_visibility(elevation):
     additional_visibility = int(elevation * 10)  # Increase visibility with elevation
     return base_visibility + additional_visibility
 
-def get_visible_cells(player_x, player_y, visibility_range, map_width, map_height):
+def get_visible_cells(player_x, player_y, visibility_range, map_width, map_height, terrain_map, height_map):
     visible_cells = []
     for i in range(player_x - visibility_range, player_x + visibility_range + 1):
         for j in range(player_y - visibility_range, player_y + visibility_range + 1):
             if 0 <= i < map_width and 0 <= j < map_height:
-                # Calculate distance based on actual grid distance
-                distance = max(abs(player_x - i), abs(player_y - j))
+                distance = np.hypot(player_x - i, player_y - j)
                 if distance <= visibility_range:
-                    visible_cells.append((i, j))
+                    # Perform line-of-sight check with elevation
+                    line_cells = bresenham_line(player_x, player_y, i, j)
+                    blocked = False
+                    prev_elevation = height_map[player_x][player_y]
+                    for cell in line_cells:
+                        terrain = terrain_map[cell[0]][cell[1]]
+                        current_elevation = height_map[cell[0]][cell[1]]
+                        elevation_diff = current_elevation - prev_elevation
+                        if is_blocking_terrain(terrain) and cell != (player_x, player_y):
+                            blocked = True
+                            break
+                        if elevation_diff > 0.1:  # Threshold for elevation blocking view
+                            blocked = True
+                            break
+                        prev_elevation = current_elevation
+                    if not blocked:
+                        visible_cells.append((i, j))
     return visible_cells
+
 
 def get_weather():
     return random.choice(weather_conditions)
@@ -81,3 +97,35 @@ def enemy_can_see_player(player_x, player_y, enemy_x, enemy_y, terrain_map):
     if distance <= 5:
         return True
     return False
+
+def is_blocking_terrain(terrain_type):
+    return terrain_type in ['Mountain', 'Forest']
+
+def bresenham_line(x0, y0, x1, y1):
+    """Bresenham's Line Algorithm to get the cells along a line."""
+    cells = []
+    dx = abs(x1 - x0)
+    dy = abs(y1 - y0)
+    x, y = x0, y0
+    sx = -1 if x0 > x1 else 1
+    sy = -1 if y0 > y1 else 1
+    if dx > dy:
+        err = dx / 2.0
+        while x != x1:
+            cells.append((x, y))
+            err -= dy
+            if err < 0:
+                y += sy
+                err += dx
+            x += sx
+    else:
+        err = dy / 2.0
+        while y != y1:
+            cells.append((x, y))
+            err -= dx
+            if err < 0:
+                x += sx
+                err += dy
+            y += sy
+    cells.append((x1, y1))
+    return cells

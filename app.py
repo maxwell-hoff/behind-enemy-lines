@@ -29,11 +29,11 @@ def game_state():
     player_y = player_state['y']
     elevation = height_map[player_x][player_y]
     visibility_range = calculate_visibility(elevation)
-    visible_cells = get_visible_cells(player_x, player_y, visibility_range, map_width, map_height)
+    visible_cells_coords = get_visible_cells(player_x, player_y, visibility_range, map_width, map_height, terrain_map, height_map)
     
     # Collect data for the visible cells
     visible_terrain = []
-    for cell in visible_cells:
+    for cell in visible_cells_coords:
         cell_data = {
             'x': cell[0],
             'y': cell[1],
@@ -72,25 +72,25 @@ def game_state():
 
 @app.route('/move', methods=['POST'])
 def move():
-    direction = request.json.get('direction')
-    dx, dy = 0, 0
-    if direction == 'north':
-        dx = -1
-    elif direction == 'south':
-        dx = 1
-    elif direction == 'east':
-        dy = 1
-    elif direction == 'west':
-        dy = -1
-    # Add diagonal movements if needed
-    new_x = player_state['x'] + dx
-    new_y = player_state['y'] + dy
-    if 0 <= new_x < map_width and 0 <= new_y < map_height:
-        player_state['previous_positions'].append((player_state['x'], player_state['y']))
-        player_state['x'] = new_x
-        player_state['y'] = new_y
-        player_state['moves'] += 1
-    return jsonify({'status': 'moved'})
+    data = request.json
+    target_x = data.get('x')
+    target_y = data.get('y')
+    player_x = player_state['x']
+    player_y = player_state['y']
+
+    # Check if the target cell is adjacent
+    if abs(target_x - player_x) <= 1 and abs(target_y - player_y) <= 1:
+        # Check if the move is within the map bounds
+        if 0 <= target_x < map_width and 0 <= target_y < map_height:
+            player_state['previous_positions'].append((player_x, player_y))
+            player_state['x'] = target_x
+            player_state['y'] = target_y
+            player_state['moves'] += 1
+            return jsonify({'status': 'moved'})
+        else:
+            return jsonify({'status': 'error', 'message': 'Target cell is out of bounds.'})
+    else:
+        return jsonify({'status': 'error', 'message': 'You can only move to adjacent cells.'})
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))  # Use port from environment variable or default to 5000

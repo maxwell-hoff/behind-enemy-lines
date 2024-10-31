@@ -53,6 +53,14 @@ function updateGameState() {
                     cell.title += '\nYou are here';
                 }
 
+                // Make adjacent cells clickable for movement
+                if (Math.abs(cellX - playerX) <= 1 && Math.abs(cellY - playerY) <= 1 && !(cellX === playerX && cellY === playerY)) {
+                    cell.classList.add('clickable');
+                    cell.addEventListener('click', function() {
+                        moveToCell(cellX, cellY);
+                    });
+                }
+
                 grid.appendChild(cell);
             }
         }
@@ -67,18 +75,27 @@ function updateGameState() {
     });
 }
 
-function move(direction) {
+function moveToCell(x, y) {
     fetch('/move', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({'direction': direction})
+        body: JSON.stringify({'x': x, 'y': y})
     }).then(response => response.json())
     .then(data => {
         if (data.status === 'moved') {
             updateGameState();
+        } else {
+            alert(data.message || 'Unable to move to that cell.');
         }
     });
 }
+
+// Remove the directional move function if not needed
+/*
+function move(direction) {
+    // ... existing code ...
+}
+*/
 
 // Initial game state update
 updateGameState();

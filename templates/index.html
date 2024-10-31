@@ -31,18 +31,16 @@
         .Previous { opacity: 0.5; }
         /* Player Position */
         .Player { border: 2px solid gold; }
+        .clickable {
+            cursor: pointer;
+            border: 2px dashed yellow;
+        }
     </style>
 </head>
 <body>
     <h1 style="text-align:center;">WWII Escape Game</h1>
     <div id="info" style="text-align:center;"></div>
     <div id="grid"></div>
-    <div style="text-align:center; margin-top:20px;">
-        <button onclick="move('north')">Move North</button>
-        <button onclick="move('south')">Move South</button>
-        <button onclick="move('east')">Move East</button>
-        <button onclick="move('west')">Move West</button>
-    </div>
     <!-- Custom JS -->
     <script src="{{ url_for('static', filename='game.js') }}"></script>
 </body>
