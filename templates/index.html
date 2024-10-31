@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WWII Escape Game</title>
+    <meta charset="utf-8" />
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <!-- Custom CSS -->
+    <style>
+        #map { height: 600px; }
+    </style>
+</head>
+<body>
+    <h1>WWII Escape Game</h1>
+    <div id="map"></div>
+    <button onclick="move('north')">Move North</button>
+    <button onclick="move('south')">Move South</button>
+    <button onclick="move('east')">Move East</button>
+    <button onclick="move('west')">Move West</button>
+    <p id="info"></p>
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <!-- Custom JS -->
+    <script src="{{ url_for('static', filename='game.js') }}"></script>
+</body>
+</html>
