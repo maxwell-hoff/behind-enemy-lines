@@ -94,6 +94,20 @@ def move():
     else:
         return jsonify({'status': 'error', 'message': 'You can only move to adjacent cells.'})
 
+@app.route('/view_terrain')
+def view_terrain():
+    return render_template('view_terrain.html')
+
+@app.route('/terrain_data')
+def terrain_data():
+    terrain_data = []
+    for i in range(map_width):
+        row = []
+        for j in range(map_height):
+            row.append(terrain_map[i][j])
+        terrain_data.append(row)
+    return jsonify({'terrain_data': terrain_data, 'map_width': map_width, 'map_height': map_height})
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))  # Use port from environment variable or default to 5000
     app.run(debug=True, host='0.0.0.0', port=port)

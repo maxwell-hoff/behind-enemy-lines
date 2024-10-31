@@ -6,9 +6,9 @@ function updateGameState() {
         const grid = document.getElementById('grid');
         grid.innerHTML = '';
 
-        // Determine the grid size (e.g., 7x7)
-        const gridSize = 15; // Increased from 7 to 15
-        const halfGrid = Math.floor(gridSize / 2);        
+        // Determine the grid size (e.g., 15x15)
+        const gridSize = 15; // Must be an odd number to center on player
+        const halfGrid = Math.floor(gridSize / 2);
 
         // Get player position
         const playerX = data.player_position.x;
@@ -17,8 +17,8 @@ function updateGameState() {
         // Create cells
         for (let row = -halfGrid; row <= halfGrid; row++) {
             for (let col = -halfGrid; col <= halfGrid; col++) {
-                const cellX = playerX + row;
-                const cellY = playerY + col;
+                const cellX = playerX + col;  // Swapped col and row
+                const cellY = playerY + row;  // Swapped col and row
                 const cell = document.createElement('div');
                 cell.classList.add('cell');
 
@@ -29,7 +29,7 @@ function updateGameState() {
                     cell.title = `Terrain: ${visibleCell.terrain}\nElevation: ${visibleCell.elevation.toFixed(2)}`;
                 } else {
                     // Cell is not visible
-                    cell.style.display = 'none';
+                    cell.style.visibility = 'hidden'; // Use visibility instead of display
                 }
 
                 // Mark previous positions
@@ -54,7 +54,11 @@ function updateGameState() {
                 }
 
                 // Make adjacent cells clickable for movement
-                if (Math.abs(cellX - playerX) <= 1 && Math.abs(cellY - playerY) <= 1 && !(cellX === playerX && cellY === playerY)) {
+                if (
+                    Math.abs(cellX - playerX) <= 1 &&
+                    Math.abs(cellY - playerY) <= 1 &&
+                    !(cellX === playerX && cellY === playerY)
+                ) {
                     cell.classList.add('clickable');
                     cell.addEventListener('click', function() {
                         moveToCell(cellX, cellY);

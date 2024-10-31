@@ -42,25 +42,12 @@ def get_visible_cells(player_x, player_y, visibility_range, map_width, map_heigh
     for i in range(player_x - visibility_range, player_x + visibility_range + 1):
         for j in range(player_y - visibility_range, player_y + visibility_range + 1):
             if 0 <= i < map_width and 0 <= j < map_height:
-                distance = np.hypot(player_x - i, player_y - j)
+                dx = player_x - i
+                dy = player_y - j
+                distance = np.sqrt(dx * dx + dy * dy)
                 if distance <= visibility_range:
-                    # Perform line-of-sight check with elevation
-                    line_cells = bresenham_line(player_x, player_y, i, j)
-                    blocked = False
-                    prev_elevation = height_map[player_x][player_y]
-                    for cell in line_cells:
-                        terrain = terrain_map[cell[0]][cell[1]]
-                        current_elevation = height_map[cell[0]][cell[1]]
-                        elevation_diff = current_elevation - prev_elevation
-                        if is_blocking_terrain(terrain) and cell != (player_x, player_y):
-                            blocked = True
-                            break
-                        if elevation_diff > 0.1:  # Threshold for elevation blocking view
-                            blocked = True
-                            break
-                        prev_elevation = current_elevation
-                    if not blocked:
-                        visible_cells.append((i, j))
+                    # Optionally perform line-of-sight checks here
+                    visible_cells.append((i, j))
     return visible_cells
 
 

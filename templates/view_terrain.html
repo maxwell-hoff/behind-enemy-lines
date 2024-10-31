@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Terrain Viewer</title>
+    <style>
+        #terrainCanvas {
+            border: 1px solid black;
+        }
+    </style>
+</head>
+<body>
+    <h1>Terrain Viewer</h1>
+    <canvas id="terrainCanvas" width="500" height="500"></canvas>
+    <script>
+        fetch('/terrain_data')
+            .then(response => response.json())
+            .then(data => {
+                const canvas = document.getElementById('terrainCanvas');
+                const ctx = canvas.getContext('2d');
+                const terrainData = data.terrain_data;
+                const mapWidth = data.map_width;
+                const mapHeight = data.map_height;
+                const cellSizeX = canvas.width / mapWidth;
+                const cellSizeY = canvas.height / mapHeight;
+
+                for (let i = 0; i < mapWidth; i++) {
+                    for (let j = 0; j < mapHeight; j++) {
+                        const terrain = terrainData[i][j];
+                        let color;
+                        switch(terrain) {
+                            case 'Water': color = 'blue'; break;
+                            case 'Sand': color = 'yellow'; break;
+                            case 'Grass': color = 'green'; break;
+                            case 'Forest': color = 'darkgreen'; break;
+                            case 'Mountain': color = 'grey'; break;
+                            default: color = 'white';
+                        }
+                        ctx.fillStyle = color;
+                        ctx.fillRect(j * cellSizeX, i * cellSizeY, cellSizeX, cellSizeY);
+                    }
+                }
+            });
+    </script>
+</body>
+</html>
