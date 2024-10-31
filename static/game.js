@@ -7,8 +7,8 @@ function updateGameState() {
         grid.innerHTML = '';
 
         // Determine the grid size (e.g., 7x7)
-        const gridSize = 7; // Must be an odd number to center on player
-        const halfGrid = Math.floor(gridSize / 2);
+        const gridSize = 15; // Increased from 7 to 15
+        const halfGrid = Math.floor(gridSize / 2);        
 
         // Get player position
         const playerX = data.player_position.x;
@@ -29,7 +29,7 @@ function updateGameState() {
                     cell.title = `Terrain: ${visibleCell.terrain}\nElevation: ${visibleCell.elevation.toFixed(2)}`;
                 } else {
                     // Cell is not visible
-                    cell.style.backgroundColor = 'black';
+                    cell.style.display = 'none';
                 }
 
                 // Mark previous positions
@@ -80,10 +80,11 @@ function moveToCell(x, y) {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({'x': x, 'y': y})
-    }).then(response => response.json())
+    })
+    .then(response => response.json())
     .then(data => {
         if (data.status === 'moved') {
-            updateGameState();
+            updateGameState();  // Refresh the game state
         } else {
             alert(data.message || 'Unable to move to that cell.');
         }

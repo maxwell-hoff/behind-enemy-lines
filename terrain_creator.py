@@ -10,8 +10,8 @@ def generate_height_map(width, height, scale):
     height_map = np.zeros((height, width))
     for i in range(height):
         for j in range(width):
-            x = i / scale
-            y = j / scale
+            x = i / (scale * 5)  # Adjusted scale for more detail
+            y = j / (scale * 5)
             height_map[i][j] = noise([x, y])
     return height_map
 

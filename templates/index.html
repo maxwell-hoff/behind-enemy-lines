@@ -7,15 +7,15 @@
     <style>
         #grid {
             display: grid;
-            grid-template-columns: repeat(7, 50px); /* Adjust the number of columns and cell size */
-            grid-template-rows: repeat(7, 50px);    /* Adjust the number of rows and cell size */
-            gap: 2px;
+            grid-template-columns: repeat(15, 30px); /* Adjusted columns and cell size */
+            grid-template-rows: repeat(15, 30px);    /* Adjusted rows and cell size */
+            gap: 1px;
             margin: 0 auto;
             margin-top: 20px;
         }
         .cell {
-            width: 50px;
-            height: 50px;
+            width: 30px;
+            height: 30px;
             background-color: grey;
             border: 1px solid black;
         }
@@ -28,12 +28,19 @@
         /* Enemy */
         .Enemy { background-color: red; }
         /* Previous Positions */
-        .Previous { opacity: 0.5; }
+        /* Previous Positions */
+        .Previous {
+            background-color: lightgrey;  /* Changed to a lighter grey */
+            opacity: 0.7;                 /* Adjusted opacity for better visibility */
+        }
         /* Player Position */
-        .Player { border: 2px solid gold; }
+        /* Player Position */
+        .Player {
+            border: 2px solid gold;
+            background-color: orange;  /* Added background color to distinguish current position */
+        }
         .clickable {
             cursor: pointer;
-            border: 2px dashed yellow;
         }
     </style>
 </head>

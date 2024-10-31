@@ -1,12 +1,12 @@
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, make_response
 from terrain_creator import *
 import os
 
 app = Flask(__name__)
 
 # Global game state (for demonstration purposes)
-map_width = 100
-map_height = 100
+map_width = 500
+map_height = 500
 height_map = generate_height_map(map_width, map_height, scale=20)
 terrain_map = assign_terrain_types(height_map)
 
@@ -68,7 +68,9 @@ def game_state():
         'enemies_in_sight': enemies_in_sight,
         'previous_positions': player_state['previous_positions']
     }
-    return jsonify(response)
+    response = make_response(jsonify(response))
+    response.headers['Cache-Control'] = 'no-store'
+    return response
 
 @app.route('/move', methods=['POST'])
 def move():
