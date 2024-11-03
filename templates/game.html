@@ -79,31 +79,31 @@
                 // Set grid template columns and rows
                 const grid = document.getElementById('grid');
                 grid.innerHTML = ''; // Clear previous content
-                grid.style.gridTemplateColumns = repeat(${gridSize}, 5px);
-                grid.style.gridTemplateRows = repeat(${gridSize}, 5px);
+                grid.style.gridTemplateColumns = `repeat(${gridSize}, 5px)`;
+                grid.style.gridTemplateRows = `repeat(${gridSize}, 5px)`;
 
                 // Display team code
                 document.getElementById('team-code').textContent = data.team_code;
 
                 // Create a Set of visible cell positions for quick lookup
-                const visibleCellsSet = new Set(data.visible_cells.map(cell => ${cell.x},${cell.y}));
+                const visibleCellsSet = new Set(data.visible_cells.map(cell => `${cell.x},${cell.y}`));
 
                 // Create a Set of previous positions
-                const previousPositionsSet = new Set(data.previous_positions.map(pos => ${pos.x},${pos.y}));
+                const previousPositionsSet = new Set(data.previous_positions.map(pos => `${pos.x},${pos.y}`));
 
                 for (let y = -halfGrid; y <= halfGrid; y++) {
                     for (let x = -halfGrid; x <= halfGrid; x++) {
                         const cell = document.createElement('div');
 
                         // Check if the cell is in the set of visible cells
-                        if (visibleCellsSet.has(${x},${y})) {
+                        if (visibleCellsSet.has(`${x},${y}`)) {
                             cell.classList.add('cell');
 
                             // Center cell
                             if (x === 0 && y === 0) {
                                 cell.classList.add('center');
                                 cell.classList.remove('previous'); // Ensure center cell takes priority
-                            } else if (previousPositionsSet.has(${x},${y})) {
+                            } else if (previousPositionsSet.has(`${x},${y}`)) {
                                 // Previous position
                                 cell.classList.add('previous');
                             }

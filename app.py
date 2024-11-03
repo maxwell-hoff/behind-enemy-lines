@@ -1,5 +1,5 @@
 import json
-from flask import Flask, render_template, jsonify, request, session, redirect, url_for
+from flask import Flask, render_template, jsonify, request, redirect, url_for, make_response
 import math
 import os
 import redis
@@ -7,7 +7,6 @@ import uuid
 import ssl
 
 app = Flask(__name__)
-app.secret_key = 'your_secure_secret_key'  # Replace with a secure secret key
 
 # Get the Redis URL from the environment variables
 REDIS_URL = os.environ.get('REDIS_TLS_URL') or os.environ.get('REDIS_URL')
@@ -35,18 +34,42 @@ def get_visibility_range():
     visibility_range_squares = int(horizon_distance_miles / SQUARE_SIZE_MILES)
     return visibility_range_squares
 
+# Session management functions
+def get_session_id():
+    session_id = request.cookies.get('session_id')
+    if not session_id:
+        session_id = str(uuid.uuid4())
+    return session_id
+
+def get_session_data(session_id):
+    session_data_json = redis_client.get(f'session:{session_id}')
+    if session_data_json:
+        return json.loads(session_data_json)
+    else:
+        return {}
+
+def save_session_data(session_id, session_data):
+    redis_client.set(f'session:{session_id}', json.dumps(session_data))
+
 @app.route('/')
 def index():
-    if 'team_code' in session:
+    session_id = get_session_id()
+    session_data = get_session_data(session_id)
+    if 'team_code' in session_data:
         # Player is already in a game
-        return redirect(url_for('game'))
-    return render_template('index.html')
+        response = make_response(redirect(url_for('game')))
+    else:
+        response = make_response(render_template('index.html'))
+    response.set_cookie('session_id', session_id)
+    return response
 
 @app.route('/start_game', methods=['POST'])
 def start_game():
+    session_id = get_session_id()
+    session_data = get_session_data(session_id)
     # Generate a unique team code
     team_code = str(uuid.uuid4())[:8]  # Shorten UUID to 8 characters
-    session['team_code'] = team_code
+    session_data['team_code'] = team_code
 
     # Initialize game state in Redis
     game_state = {
@@ -55,10 +78,17 @@ def start_game():
     }
     redis_client.set(team_code, json.dumps(game_state))
 
-    return jsonify({'team_code': team_code})
+    # Save session data
+    save_session_data(session_id, session_data)
+
+    response = jsonify({'team_code': team_code})
+    response.set_cookie('session_id', session_id)
+    return response
 
 @app.route('/join_game', methods=['POST'])
 def join_game():
+    session_id = get_session_id()
+    session_data = get_session_data(session_id)
     team_code = request.json.get('team_code')
     if not team_code:
         return jsonify({'status': 'error', 'message': 'No team code provided'}), 400
@@ -66,22 +96,32 @@ def join_game():
     if not redis_client.exists(team_code):
         return jsonify({'status': 'error', 'message': 'Invalid team code'}), 400
 
-    session['team_code'] = team_code
-    return jsonify({'status': 'success'})
+    session_data['team_code'] = team_code
+    save_session_data(session_id, session_data)
+
+    response = jsonify({'status': 'success'})
+    response.set_cookie('session_id', session_id)
+    return response
 
 @app.route('/game')
 def game():
-    if 'team_code' not in session:
+    session_id = get_session_id()
+    session_data = get_session_data(session_id)
+    if 'team_code' not in session_data:
         return redirect(url_for('index'))
-    return render_template('game.html')
+    response = make_response(render_template('game.html'))
+    response.set_cookie('session_id', session_id)
+    return response
 
 @app.route('/visible_cells')
 def visible_cells():
-    if 'team_code' not in session:
+    session_id = get_session_id()
+    session_data = get_session_data(session_id)
+    if 'team_code' not in session_data:
         return jsonify({'status': 'error', 'message': 'Not in a game'}), 400
 
-    team_code = session['team_code']
-    player_id = session.get('player_id')
+    team_code = session_data['team_code']
+    player_id = session_data.get('player_id')
 
     # Load game state from Redis
     game_state_json = redis_client.get(team_code)
@@ -94,10 +134,13 @@ def visible_cells():
     if not player_id or player_id not in game_state['players']:
         # Assign a new player ID and position
         player_id = str(uuid.uuid4())
-        session['player_id'] = player_id
+        session_data['player_id'] = player_id
         game_state['players'][player_id] = {'x': 0, 'y': 0}
         # Update game state in Redis
         redis_client.set(team_code, json.dumps(game_state))
+
+    # Save session data
+    save_session_data(session_id, session_data)
 
     player_position = game_state['players'][player_id]
     center_x = player_position['x']
@@ -123,21 +166,24 @@ def visible_cells():
         rel_y = pos['y'] - center_y
         relative_previous_positions.append({'x': rel_x, 'y': rel_y})
 
-    # Return the visibility range and the list of visible cells
-    return jsonify({
+    response = jsonify({
         'visibility_range': visibility_range_squares,
         'visible_cells': visible_cells,
         'previous_positions': relative_previous_positions,
         'team_code': team_code
     })
+    response.set_cookie('session_id', session_id)
+    return response
 
 @app.route('/move', methods=['POST'])
 def move():
-    if 'team_code' not in session:
+    session_id = get_session_id()
+    session_data = get_session_data(session_id)
+    if 'team_code' not in session_data:
         return jsonify({'status': 'error', 'message': 'Not in a game'}), 400
 
-    team_code = session['team_code']
-    player_id = session.get('player_id')
+    team_code = session_data['team_code']
+    player_id = session_data.get('player_id')
 
     direction = request.json.get('direction')
     if not direction:
@@ -178,7 +224,9 @@ def move():
     # Update game state in Redis
     redis_client.set(team_code, json.dumps(game_state))
 
-    return jsonify({'status': 'success'})
+    response = jsonify({'status': 'success'})
+    response.set_cookie('session_id', session_id)
+    return response
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))  # Use the PORT environment variable if available
