@@ -74,7 +74,7 @@ def start_game():
 
     # Initialize game state in Redis
     game_state = {
-        'players': {player_name: {'x': 0, 'y': 0}},
+        'position': {'x': 0, 'y': 0},
         'previous_positions': [],
         'max_players': 4,  # You can adjust this as needed
         'player_names': [player_name],
@@ -118,7 +118,6 @@ def join_game():
         return jsonify({'status': 'error', 'message': 'Lobby is full'}), 400
 
     # Add player to the game state
-    game_state['players'][player_name] = {'x': 0, 'y': 0}
     game_state['player_names'].append(player_name)
     game_state['ready_statuses'].append(False)
     # Update game state in Redis
@@ -156,7 +155,6 @@ def visible_cells():
         return jsonify({'status': 'error', 'message': 'Not in a game'}), 400
 
     lobby_code = session_data['lobby_code']
-    player_name = session_data.get('player_name')
 
     # Load game state from Redis
     game_state_json = redis_client.get(lobby_code)
@@ -165,13 +163,9 @@ def visible_cells():
 
     game_state = json.loads(game_state_json)
 
-    # Get player's position
-    if not player_name or player_name not in game_state['players']:
-        return jsonify({'status': 'error', 'message': 'Player not found in game state'}), 400
-
-    player_position = game_state['players'][player_name]
-    center_x = player_position['x']
-    center_y = player_position['y']
+    position = game_state['position']
+    center_x = position['x']
+    center_y = position['y']
 
     visibility_range_squares = get_visibility_range()
 
@@ -183,10 +177,10 @@ def visible_cells():
             dy = y - center_y
             distance = math.sqrt(dx * dx + dy * dy)
             if distance <= visibility_range_squares:
-                # Positions are relative to the player's position
+                # Positions are relative to the current position
                 visible_cells.append({'x': x - center_x, 'y': y - center_y})
 
-    # Prepare previous positions relative to the player's current position
+    # Prepare previous positions relative to the current position
     relative_previous_positions = []
     for pos in game_state.get('previous_positions', []):
         rel_x = pos['x'] - center_x
@@ -210,7 +204,6 @@ def move():
         return jsonify({'status': 'error', 'message': 'Not in a game'}), 400
 
     lobby_code = session_data['lobby_code']
-    player_name = session_data.get('player_name')
 
     direction = request.json.get('direction')
     if not direction:
@@ -223,24 +216,20 @@ def move():
 
     game_state = json.loads(game_state_json)
 
-    # Get player's position
-    if not player_name or player_name not in game_state['players']:
-        return jsonify({'status': 'error', 'message': 'Player not found in game state'}), 400
-
-    player_position = game_state['players'][player_name]
+    position = game_state['position']
 
     # Update previous positions
-    game_state.setdefault('previous_positions', []).append({'x': player_position['x'], 'y': player_position['y']})
+    game_state.setdefault('previous_positions', []).append({'x': position['x'], 'y': position['y']})
 
-    # Update player's position based on direction
+    # Update position based on direction
     if direction == 'up':
-        player_position['y'] -= 1
+        position['y'] -= 1
     elif direction == 'down':
-        player_position['y'] += 1
+        position['y'] += 1
     elif direction == 'left':
-        player_position['x'] -= 1
+        position['x'] -= 1
     elif direction == 'right':
-        player_position['x'] += 1
+        position['x'] += 1
     else:
         return jsonify({'status': 'error', 'message': 'Invalid direction'}), 400
 
@@ -249,7 +238,7 @@ def move():
         game_state['previous_positions'] = game_state['previous_positions'][-100:]
 
     # Update game state in Redis
-    redis_client.set(lobby_code, json.dumps(game_state))
+    redis_client.set(lobby_code, json.dumps(game_state), ex=3600)  # Reset expiration time
 
     response = jsonify({'status': 'success'})
     response.set_cookie('session_id', session_id)

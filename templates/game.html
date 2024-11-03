@@ -36,7 +36,7 @@
         #controls button {
             margin: 2px;
         }
-        #team-code-display {
+        #lobby-code-display {
             position: absolute;
             top: 10px;
             right: 10px;
@@ -83,7 +83,7 @@
                 grid.style.gridTemplateColumns = `repeat(${gridSize}, 5px)`;
                 grid.style.gridTemplateRows = `repeat(${gridSize}, 5px)`;
 
-                // Display team code
+                // Display lobby code
                 document.getElementById('lobby-code').textContent = data.lobby_code;
 
                 // Create a Set of visible cell positions for quick lookup
@@ -163,8 +163,8 @@
         // Initial grid update
         updateGrid();
 
-        // Periodically update the grid to reflect movements by other players
-        setInterval(updateGrid, 5000); // Update every 5 seconds
+        // Periodically update the grid
+        setInterval(updateGrid, 1000); // Update every second
     </script>
 </body>
 </html>
