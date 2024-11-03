@@ -3,6 +3,7 @@
 <head>
     <title>Flat Surface Horizon Grid - Game</title>
     <style>
+        /* Your existing styles */
         body, html {
             height: 100%;
             margin: 0;
@@ -73,15 +74,18 @@
                     window.location.href = '/';
                     return;
                 }
-                const visibilityRange = data.visibility_range;
-                const gridSize = visibilityRange * 2 + 1; // Total grid size
-                const halfGrid = visibilityRange;
+                const visibilityRangeX = data.visibility_range_x;
+                const visibilityRangeY = data.visibility_range_y;
+                const gridSizeX = visibilityRangeX * 2 + 1; // Total grid size in x-direction
+                const gridSizeY = visibilityRangeY * 2 + 1; // Total grid size in y-direction
+                const halfGridX = visibilityRangeX;
+                const halfGridY = visibilityRangeY;
 
                 // Set grid template columns and rows
                 const grid = document.getElementById('grid');
                 grid.innerHTML = ''; // Clear previous content
-                grid.style.gridTemplateColumns = `repeat(${gridSize}, 5px)`;
-                grid.style.gridTemplateRows = `repeat(${gridSize}, 5px)`;
+                grid.style.gridTemplateColumns = `repeat(${gridSizeX}, 5px)`;
+                grid.style.gridTemplateRows = `repeat(${gridSizeY}, 5px)`;
 
                 // Display lobby code
                 document.getElementById('lobby-code').textContent = data.lobby_code;
@@ -92,8 +96,8 @@
                 // Create a Set of previous positions
                 const previousPositionsSet = new Set(data.previous_positions.map(pos => `${pos.x},${pos.y}`));
 
-                for (let y = -halfGrid; y <= halfGrid; y++) {
-                    for (let x = -halfGrid; x <= halfGrid; x++) {
+                for (let y = -halfGridY; y <= halfGridY; y++) {
+                    for (let x = -halfGridX; x <= halfGridX; x++) {
                         const cell = document.createElement('div');
 
                         // Check if the cell is in the set of visible cells

@@ -28,8 +28,19 @@ SQUARE_SIZE_MILES = 0.1
 # Calculate visibility range
 def get_visibility_range():
     horizon_distance_miles = 1.22 * math.sqrt(VIEWER_HEIGHT_FT)
-    visibility_range_squares = int(horizon_distance_miles / SQUARE_SIZE_MILES)
-    return visibility_range_squares
+    tilt_angle_degrees = 15  # Tilt angle
+    tilt_angle_radians = math.radians(tilt_angle_degrees)
+    cos_theta = math.cos(tilt_angle_radians)
+    sec_theta = 1 / cos_theta
+
+    # Semi-major and semi-minor axes
+    a_miles = horizon_distance_miles * sec_theta
+    b_miles = horizon_distance_miles * cos_theta
+
+    # Convert distances to squares
+    a_squares = int(a_miles / SQUARE_SIZE_MILES)
+    b_squares = int(b_miles / SQUARE_SIZE_MILES)
+    return a_squares, b_squares
 
 # Session management functions
 def get_session_id():
@@ -167,18 +178,21 @@ def visible_cells():
     center_x = position['x']
     center_y = position['y']
 
-    visibility_range_squares = get_visibility_range()
+    # Get the adjusted visibility ranges
+    a_squares, b_squares = get_visibility_range()
+    half_grid_x = a_squares
+    half_grid_y = b_squares
 
-    # Compute the positions of cells within the circular visibility range
+    # Compute the positions of cells within the elliptical visibility range
     visible_cells = []
-    for y in range(center_y - visibility_range_squares, center_y + visibility_range_squares + 1):
-        for x in range(center_x - visibility_range_squares, center_x + visibility_range_squares + 1):
+    for y in range(center_y - half_grid_y, center_y + half_grid_y + 1):
+        for x in range(center_x - half_grid_x, center_x + half_grid_x + 1):
             dx = x - center_x
             dy = y - center_y
-            distance = math.sqrt(dx * dx + dy * dy)
-            if distance <= visibility_range_squares:
+            # Ellipse equation
+            if (dx / a_squares) ** 2 + (dy / b_squares) ** 2 <= 1:
                 # Positions are relative to the current position
-                visible_cells.append({'x': x - center_x, 'y': y - center_y})
+                visible_cells.append({'x': dx, 'y': dy})
 
     # Prepare previous positions relative to the current position
     relative_previous_positions = []
@@ -188,7 +202,8 @@ def visible_cells():
         relative_previous_positions.append({'x': rel_x, 'y': rel_y})
 
     response = jsonify({
-        'visibility_range': visibility_range_squares,
+        'visibility_range_x': a_squares,
+        'visibility_range_y': b_squares,
         'visible_cells': visible_cells,
         'previous_positions': relative_previous_positions,
         'lobby_code': lobby_code
