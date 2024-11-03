@@ -41,7 +41,7 @@
     </div>
     <script>
         function startGame() {
-            const playerName = 'Player1'; // Or prompt the user for a name
+            const playerName = document.getElementById('player-name-input').value.trim() || 'Player1';
             fetch('/start_game', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
@@ -66,7 +66,7 @@
 
         function joinGame() {
             const lobbyCode = document.getElementById('lobby-code-input').value.trim();
-            const playerName = 'Player'; // Or prompt the user for a name
+            const playerName = document.getElementById('player-name-input').value.trim() || 'Player';
             if (!lobbyCode) {
                 alert('Please enter a lobby code.');
                 return;
