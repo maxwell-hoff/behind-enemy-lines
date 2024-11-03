@@ -49,6 +49,7 @@
 </head>
 <body>
     <div id="lobby-code-display">Lobby Code: <span id="lobby-code"></span></div>
+    <button onclick="leaveGame()">Leave Game</button>
     <div id="grid-container">
         <div id="controls">
             <div style="display: flex; justify-content: center;">
@@ -139,6 +140,23 @@
             })
             .catch(error => {
                 console.error('Error moving:', error);
+            });
+        }
+
+        function leaveGame() {
+            fetch('/leave_game', {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    window.location.href = '/';
+                } else {
+                    alert('Error leaving game.');
+                }
+            })
+            .catch(error => {
+                console.error('Error leaving game:', error);
             });
         }
 

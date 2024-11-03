@@ -53,12 +53,8 @@ def generate_lobby_code():
 @app.route('/')
 def index():
     session_id = get_session_id()
-    session_data = get_session_data(session_id)
-    if 'lobby_code' in session_data:
-        # Player is already in a game
-        response = make_response(redirect(url_for('game')))
-    else:
-        response = make_response(render_template('index.html'))
+    # Always render index.html
+    response = make_response(render_template('index.html'))
     response.set_cookie('session_id', session_id)
     return response
 
@@ -254,6 +250,18 @@ def move():
     # Update game state in Redis
     redis_client.set(lobby_code, json.dumps(game_state))
 
+    response = jsonify({'status': 'success'})
+    response.set_cookie('session_id', session_id)
+    return response
+
+@app.route('/leave_game', methods=['POST'])
+def leave_game():
+    session_id = get_session_id()
+    session_data = get_session_data(session_id)
+    # Remove 'lobby_code' and 'player_name' from session data
+    session_data.pop('lobby_code', None)
+    session_data.pop('player_name', None)
+    save_session_data(session_id, session_data)
     response = jsonify({'status': 'success'})
     response.set_cookie('session_id', session_id)
     return response
