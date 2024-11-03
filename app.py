@@ -20,7 +20,8 @@ if REDIS_URL.startswith('rediss://'):
     ssl_context.check_hostname = False
     ssl_context.verify_mode = ssl.CERT_NONE
 
-    redis_client = redis.Redis.from_url(REDIS_URL, ssl=True, ssl_cert_reqs=None, ssl_context=ssl_context)
+    # Remove ssl=True and ssl_cert_reqs=None
+    redis_client = redis.Redis.from_url(REDIS_URL, ssl_context=ssl_context)
 else:
     redis_client = redis.Redis.from_url(REDIS_URL)
 
