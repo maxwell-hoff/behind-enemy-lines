@@ -1,52 +1,89 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>WWII Escape Game</title>
-    <meta charset="utf-8" />
-    <!-- Custom CSS -->
+    <title>Flat Surface Horizon Grid - Start or Join Game</title>
     <style>
-        #grid {
-            display: grid;
-            gap: 1px;
-            margin: 0 auto;
+        body, html {
+            height: 100%;
+            margin: 0;
+            display: flex;
+            justify-content: center; /* Center horizontally */
+            align-items: center;     /* Center vertically */
+        }
+        #menu {
+            text-align: center;
+        }
+        #menu button {
+            margin: 10px;
+            padding: 10px 20px;
+        }
+        #join-form {
+            display: none;
             margin-top: 20px;
         }
-        .cell {
-            width: 10px;
-            height: 10px;
-            background-color: grey;
-            border: 1px solid black;
+        #join-form input {
+            padding: 5px;
         }
-        /* Terrain Colors */
-        .Water { background-color: blue; }
-        .Sand { background-color: yellow; }
-        .Grass { background-color: green; }
-        .Forest { background-color: darkgreen; }
-        .Mountain { background-color: grey; }
-        /* Enemy */
-        .Enemy { background-color: red; }
-        /* Previous Positions */
-        /* Previous Positions */
-        .Previous {
-            background-color: lightgrey;  /* Changed to a lighter grey */
-            opacity: 0.7;                 /* Adjusted opacity for better visibility */
-        }
-        /* Player Position */
-        /* Player Position */
-        .Player {
-            border: 2px solid gold;
-            background-color: orange;  /* Added background color to distinguish current position */
-        }
-        .clickable {
-            cursor: pointer;
+        #join-form button {
+            padding: 5px 10px;
         }
     </style>
 </head>
 <body>
-    <h1 style="text-align:center;">WWII Escape Game</h1>
-    <div id="info" style="text-align:center;"></div>
-    <div id="grid"></div>
-    <!-- Custom JS -->
-    <script src="{{ url_for('static', filename='game.js') }}"></script>
+    <div id="menu">
+        <h1>Flat Surface Horizon Grid</h1>
+        <button onclick="startGame()">Start New Game</button>
+        <button onclick="showJoinForm()">Join Game</button>
+        <div id="join-form">
+            <input type="text" id="team-code-input" placeholder="Enter Team Code">
+            <button onclick="joinGame()">Join</button>
+        </div>
+    </div>
+    <script>
+        function startGame() {
+            fetch('/start_game', {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.team_code) {
+                    window.location.href = '/game';
+                } else {
+                    alert('Error starting game.');
+                }
+            })
+            .catch(error => {
+                console.error('Error starting game:', error);
+            });
+        }
+
+        function showJoinForm() {
+            document.getElementById('join-form').style.display = 'block';
+        }
+
+        function joinGame() {
+            const teamCode = document.getElementById('team-code-input').value.trim();
+            if (!teamCode) {
+                alert('Please enter a team code.');
+                return;
+            }
+            fetch('/join_game', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({'team_code': teamCode})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    window.location.href = '/game';
+                } else {
+                    alert(data.message || 'Error joining game.');
+                }
+            })
+            .catch(error => {
+                console.error('Error joining game:', error);
+            });
+        }
+    </script>
 </body>
 </html>

@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Flat Surface Horizon Grid - Game</title>
+    <style>
+        body, html {
+            height: 100%;
+            margin: 0;
+        }
+        #grid-container {
+            display: flex;
+            flex-direction: column;
+            justify-content: center; /* Center vertically */
+            align-items: center;     /* Center horizontally */
+            height: 100%;
+        }
+        #grid {
+            display: grid;
+            grid-gap: 1px;
+            /* grid-template-columns and rows will be set dynamically */
+        }
+        .cell {
+            width: 5px;
+            height: 5px;
+            background-color: grey;
+        }
+        .center {
+            background-color: orange;
+        }
+        .previous {
+            background-color: lightgrey;
+        }
+        #controls {
+            margin-bottom: 10px;
+        }
+        #controls button {
+            margin: 2px;
+        }
+        #team-code-display {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 14px;
+            background-color: white;
+            padding: 5px;
+            border: 1px solid black;
+        }
+    </style>
+</head>
+<body>
+    <div id="team-code-display">Team Code: <span id="team-code"></span></div>
+    <div id="grid-container">
+        <div id="controls">
+            <div style="display: flex; justify-content: center;">
+                <button onclick="move('up')">Up</button>
+            </div>
+            <div style="display: flex; justify-content: center;">
+                <button onclick="move('left')">Left</button>
+                <button onclick="move('down')">Down</button>
+                <button onclick="move('right')">Right</button>
+            </div>
+        </div>
+        <div id="grid"></div>
+    </div>
+    <script>
+        function updateGrid() {
+            fetch('/visible_cells')
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'error') {
+                    alert(data.message || 'Error fetching game data.');
+                    window.location.href = '/';
+                    return;
+                }
+                const visibilityRange = data.visibility_range;
+                const gridSize = visibilityRange * 2 + 1; // Total grid size
+                const halfGrid = visibilityRange;
+
+                // Set grid template columns and rows
+                const grid = document.getElementById('grid');
+                grid.innerHTML = ''; // Clear previous content
+                grid.style.gridTemplateColumns = repeat(${gridSize}, 5px);
+                grid.style.gridTemplateRows = repeat(${gridSize}, 5px);
+
+                // Display team code
+                document.getElementById('team-code').textContent = data.team_code;
+
+                // Create a Set of visible cell positions for quick lookup
+                const visibleCellsSet = new Set(data.visible_cells.map(cell => ${cell.x},${cell.y}));
+
+                // Create a Set of previous positions
+                const previousPositionsSet = new Set(data.previous_positions.map(pos => ${pos.x},${pos.y}));
+
+                for (let y = -halfGrid; y <= halfGrid; y++) {
+                    for (let x = -halfGrid; x <= halfGrid; x++) {
+                        const cell = document.createElement('div');
+
+                        // Check if the cell is in the set of visible cells
+                        if (visibleCellsSet.has(${x},${y})) {
+                            cell.classList.add('cell');
+
+                            // Center cell
+                            if (x === 0 && y === 0) {
+                                cell.classList.add('center');
+                                cell.classList.remove('previous'); // Ensure center cell takes priority
+                            } else if (previousPositionsSet.has(${x},${y})) {
+                                // Previous position
+                                cell.classList.add('previous');
+                            }
+                        } else {
+                            // Invisible cell to maintain grid structure
+                            cell.style.width = '5px';
+                            cell.style.height = '5px';
+                            cell.style.visibility = 'hidden';
+                        }
+
+                        grid.appendChild(cell);
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching visible cells:', error);
+            });
+        }
+
+        function move(direction) {
+            fetch('/move', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({'direction': direction})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    updateGrid();
+                } else {
+                    alert(data.message || 'Unable to move.');
+                }
+            })
+            .catch(error => {
+                console.error('Error moving:', error);
+            });
+        }
+
+        // Initial grid update
+        updateGrid();
+
+        // Periodically update the grid to reflect movements by other players
+        setInterval(updateGrid, 5000); // Update every 5 seconds
+    </script>
+</body>
+</html>

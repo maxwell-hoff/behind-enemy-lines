@@ -1,119 +1,185 @@
-from flask import Flask, render_template, jsonify, request, make_response
-from terrain_creator import *
+import json
+from flask import Flask, render_template, jsonify, request, session, redirect, url_for
+import math
 import os
+import redis
+import uuid
+import ssl
 
 app = Flask(__name__)
+app.secret_key = 'your_secure_secret_key'  # Replace with a secure secret key
 
-# Global game state (for demonstration purposes)
-map_width = 300
-map_height = 300
-height_map = generate_height_map(map_width, map_height, scale=20)
-terrain_map = assign_terrain_types(height_map)
+# Get the Redis URL from the environment variables
+REDIS_URL = os.environ.get('REDIS_TLS_URL') or os.environ.get('REDIS_URL')
 
-player_state = {
-    'x': 50,
-    'y': 50,
-    'previous_positions': [],
-    'moves': 0
-}
+if not REDIS_URL:
+    raise Exception("Redis URL not found. Make sure the REDIS_URL or REDIS_TLS_URL environment variable is set.")
 
-enemy_positions = [(60, 55), (45, 48), (52, 53)]  # Sample enemy positions
+# Configure Redis client with SSL if necessary
+if REDIS_URL.startswith('rediss://'):
+    ssl_context = ssl.create_default_context()
+    ssl_context.check_hostname = False
+    ssl_context.verify_mode = ssl.CERT_NONE
+
+    redis_client = redis.Redis.from_url(REDIS_URL, ssl=True, ssl_cert_reqs=None, ssl_context=ssl_context)
+else:
+    redis_client = redis.Redis.from_url(REDIS_URL)
+
+# Horizon calculation parameters
+VIEWER_HEIGHT_FT = 6
+SQUARE_SIZE_MILES = 0.1
+
+# Calculate visibility range
+def get_visibility_range():
+    horizon_distance_miles = 1.22 * math.sqrt(VIEWER_HEIGHT_FT)
+    visibility_range_squares = int(horizon_distance_miles / SQUARE_SIZE_MILES)
+    return visibility_range_squares
 
 @app.route('/')
 def index():
+    if 'team_code' in session:
+        # Player is already in a game
+        return redirect(url_for('game'))
     return render_template('index.html')
 
-@app.route('/game_state')
-def game_state():
-    player_x = player_state['x']
-    player_y = player_state['y']
-    viewer_height_ft = 6  # Height of the viewer in feet
-    square_size_miles = 0.1  # Size of each square in miles
-    observer_elevation_ft = height_map[player_x][player_y]  # Player's elevation in feet
+@app.route('/start_game', methods=['POST'])
+def start_game():
+    # Generate a unique team code
+    team_code = str(uuid.uuid4())[:8]  # Shorten UUID to 8 characters
+    session['team_code'] = team_code
 
-    # Calculate visibility range based on viewer's height and elevation
-    visibility_range = calculate_visibility(viewer_height_ft, observer_elevation_ft, square_size_miles)
-
-    visible_cells_coords = get_visible_cells(player_x, player_y, visibility_range, map_width, map_height, height_map)
-
-    # Collect data for the visible cells
-    visible_terrain = []
-    for cell in visible_cells_coords:
-        cell_data = {
-            'x': cell[0],
-            'y': cell[1],
-            'terrain': terrain_map[cell[0]][cell[1]],
-            'elevation': height_map[cell[0]][cell[1]]
-        }
-        visible_terrain.append(cell_data)
-    
-    # Get weather and time of day
-    weather = get_weather()
-    time = get_time_of_day()
-    
-    # Calculate signal strength
-    signal_strength = calculate_signal_strength(player_x, player_y, 0, 0)  # Assuming signal source at (0,0)
-    
-    # Get sounds
-    sounds = get_sounds(player_x, player_y, enemy_positions, terrain_map, weather)
-    
-    # Enemy line of sight
-    enemies_in_sight = []
-    for enemy in enemy_positions:
-        if enemy_can_see_player(player_x, player_y, enemy[0], enemy[1], terrain_map):
-            enemies_in_sight.append({'x': enemy[0], 'y': enemy[1]})
-    
-    response = {
-        'player_position': {'x': player_x, 'y': player_y},
-        'visible_terrain': visible_terrain,
-        'weather': weather,
-        'time_of_day': time,
-        'signal_strength': signal_strength,
-        'sounds': sounds,
-        'enemies_in_sight': enemies_in_sight,
-        'previous_positions': player_state['previous_positions'],
-        'visibility_range': visibility_range  # Include visibility range in the response
+    # Initialize game state in Redis
+    game_state = {
+        'players': {},
+        'previous_positions': []
     }
-    response = make_response(jsonify(response))
-    response.headers['Cache-Control'] = 'no-store'
-    return response
+    redis_client.set(team_code, json.dumps(game_state))
+
+    return jsonify({'team_code': team_code})
+
+@app.route('/join_game', methods=['POST'])
+def join_game():
+    team_code = request.json.get('team_code')
+    if not team_code:
+        return jsonify({'status': 'error', 'message': 'No team code provided'}), 400
+
+    if not redis_client.exists(team_code):
+        return jsonify({'status': 'error', 'message': 'Invalid team code'}), 400
+
+    session['team_code'] = team_code
+    return jsonify({'status': 'success'})
+
+@app.route('/game')
+def game():
+    if 'team_code' not in session:
+        return redirect(url_for('index'))
+    return render_template('game.html')
+
+@app.route('/visible_cells')
+def visible_cells():
+    if 'team_code' not in session:
+        return jsonify({'status': 'error', 'message': 'Not in a game'}), 400
+
+    team_code = session['team_code']
+    player_id = session.get('player_id')
+
+    # Load game state from Redis
+    game_state_json = redis_client.get(team_code)
+    if not game_state_json:
+        return jsonify({'status': 'error', 'message': 'Game state not found'}), 400
+
+    game_state = json.loads(game_state_json)
+
+    # Get player's position
+    if not player_id or player_id not in game_state['players']:
+        # Assign a new player ID and position
+        player_id = str(uuid.uuid4())
+        session['player_id'] = player_id
+        game_state['players'][player_id] = {'x': 0, 'y': 0}
+        # Update game state in Redis
+        redis_client.set(team_code, json.dumps(game_state))
+
+    player_position = game_state['players'][player_id]
+    center_x = player_position['x']
+    center_y = player_position['y']
+
+    visibility_range_squares = get_visibility_range()
+
+    # Compute the positions of cells within the circular visibility range
+    visible_cells = []
+    for y in range(center_y - visibility_range_squares, center_y + visibility_range_squares + 1):
+        for x in range(center_x - visibility_range_squares, center_x + visibility_range_squares + 1):
+            dx = x - center_x
+            dy = y - center_y
+            distance = math.sqrt(dx * dx + dy * dy)
+            if distance <= visibility_range_squares:
+                # Positions are relative to the player's position
+                visible_cells.append({'x': x - center_x, 'y': y - center_y})
+
+    # Prepare previous positions relative to the player's current position
+    relative_previous_positions = []
+    for pos in game_state.get('previous_positions', []):
+        rel_x = pos['x'] - center_x
+        rel_y = pos['y'] - center_y
+        relative_previous_positions.append({'x': rel_x, 'y': rel_y})
+
+    # Return the visibility range and the list of visible cells
+    return jsonify({
+        'visibility_range': visibility_range_squares,
+        'visible_cells': visible_cells,
+        'previous_positions': relative_previous_positions,
+        'team_code': team_code
+    })
 
 @app.route('/move', methods=['POST'])
 def move():
-    data = request.json
-    target_x = data.get('x')
-    target_y = data.get('y')
-    player_x = player_state['x']
-    player_y = player_state['y']
+    if 'team_code' not in session:
+        return jsonify({'status': 'error', 'message': 'Not in a game'}), 400
 
-    # Check if the target cell is adjacent
-    if abs(target_x - player_x) <= 1 and abs(target_y - player_y) <= 1:
-        # Check if the move is within the map bounds
-        if 0 <= target_x < map_width and 0 <= target_y < map_height:
-            player_state['previous_positions'].append((player_x, player_y))
-            player_state['x'] = target_x
-            player_state['y'] = target_y
-            player_state['moves'] += 1
-            return jsonify({'status': 'moved'})
-        else:
-            return jsonify({'status': 'error', 'message': 'Target cell is out of bounds.'})
+    team_code = session['team_code']
+    player_id = session.get('player_id')
+
+    direction = request.json.get('direction')
+    if not direction:
+        return jsonify({'status': 'error', 'message': 'No direction provided'}), 400
+
+    # Load game state from Redis
+    game_state_json = redis_client.get(team_code)
+    if not game_state_json:
+        return jsonify({'status': 'error', 'message': 'Game state not found'}), 400
+
+    game_state = json.loads(game_state_json)
+
+    # Get player's position
+    if not player_id or player_id not in game_state['players']:
+        return jsonify({'status': 'error', 'message': 'Player not found in game state'}), 400
+
+    player_position = game_state['players'][player_id]
+
+    # Update previous positions
+    game_state.setdefault('previous_positions', []).append({'x': player_position['x'], 'y': player_position['y']})
+
+    # Update player's position based on direction
+    if direction == 'up':
+        player_position['y'] -= 1
+    elif direction == 'down':
+        player_position['y'] += 1
+    elif direction == 'left':
+        player_position['x'] -= 1
+    elif direction == 'right':
+        player_position['x'] += 1
     else:
-        return jsonify({'status': 'error', 'message': 'You can only move to adjacent cells.'})
+        return jsonify({'status': 'error', 'message': 'Invalid direction'}), 400
 
-@app.route('/view_terrain')
-def view_terrain():
-    return render_template('view_terrain.html')
+    # Limit the length of previous positions to avoid too much data
+    if len(game_state['previous_positions']) > 100:
+        game_state['previous_positions'] = game_state['previous_positions'][-100:]
 
-@app.route('/terrain_data')
-def terrain_data():
-    terrain_data = []
-    for i in range(map_width):
-        row = []
-        for j in range(map_height):
-            row.append(terrain_map[i][j])
-        terrain_data.append(row)
-    return jsonify({'terrain_data': terrain_data, 'map_width': map_width, 'map_height': map_height})
+    # Update game state in Redis
+    redis_client.set(team_code, json.dumps(game_state))
+
+    return jsonify({'status': 'success'})
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))  # Use port from environment variable or default to 5000
-    app.run(debug=True, host='0.0.0.0', port=port)
+    port = int(os.environ.get('PORT', 5000))  # Use the PORT environment variable if available
+    app.run(debug=False, host='0.0.0.0', port=port)  # Listen on all interfaces
