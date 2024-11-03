@@ -32,10 +32,14 @@
 <body>
     <div id="menu">
         <h1>Flat Surface Horizon Grid</h1>
+        <!-- Input for player name when starting a new game -->
+        <input type="text" id="player-name-input" placeholder="Enter Your Name">
         <button onclick="startGame()">Start New Game</button>
         <button onclick="showJoinForm()">Join Game</button>
         <div id="join-form">
+            <!-- Input for lobby code and player name when joining a game -->
             <input type="text" id="lobby-code-input" placeholder="Enter Lobby Code">
+            <input type="text" id="player-name-input-join" placeholder="Enter Your Name">
             <button onclick="joinGame()">Join</button>
         </div>
     </div>
@@ -66,7 +70,7 @@
 
         function joinGame() {
             const lobbyCode = document.getElementById('lobby-code-input').value.trim();
-            const playerName = document.getElementById('player-name-input').value.trim() || 'Player';
+            const playerName = document.getElementById('player-name-input-join').value.trim() || 'Player';
             if (!lobbyCode) {
                 alert('Please enter a lobby code.');
                 return;
