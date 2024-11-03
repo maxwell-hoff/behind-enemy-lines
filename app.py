@@ -3,27 +3,21 @@ from flask import Flask, render_template, jsonify, request, redirect, url_for, m
 import math
 import os
 import redis
+from redis.connection import SSLConnection
 import uuid
-import ssl
 
 app = Flask(__name__)
 
-# Get the Redis URL from the environment variables
-REDIS_URL = os.environ.get('REDIS_TLS_URL') or os.environ.get('REDIS_URL')
+# Set up Redis connection with SSL parameters
+redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379')
+if redis_url.startswith('redis://'):
+    redis_url = redis_url.replace('redis://', 'rediss://', 1)
 
-if not REDIS_URL:
-    raise Exception("Redis URL not found. Make sure the REDIS_URL or REDIS_TLS_URL environment variable is set.")
-
-# Configure Redis client with SSL if necessary
-if REDIS_URL.startswith('rediss://'):
-    ssl_context = ssl.create_default_context()
-    ssl_context.check_hostname = False
-    ssl_context.verify_mode = ssl.CERT_NONE
-
-    # Remove ssl=True and ssl_cert_reqs=None
-    redis_client = redis.Redis.from_url(REDIS_URL, ssl_context=ssl_context)
-else:
-    redis_client = redis.Redis.from_url(REDIS_URL)
+redis_client = redis.Redis.from_url(
+    redis_url,
+    connection_class=SSLConnection,
+    ssl_cert_reqs=None
+)
 
 # Horizon calculation parameters
 VIEWER_HEIGHT_FT = 6
@@ -52,11 +46,15 @@ def get_session_data(session_id):
 def save_session_data(session_id, session_data):
     redis_client.set(f'session:{session_id}', json.dumps(session_data))
 
+def generate_lobby_code():
+    """Generates a unique 6-character lobby code."""
+    return ''.join(uuid.uuid4().hex[:6])
+
 @app.route('/')
 def index():
     session_id = get_session_id()
     session_data = get_session_data(session_id)
-    if 'team_code' in session_data:
+    if 'lobby_code' in session_data:
         # Player is already in a game
         response = make_response(redirect(url_for('game')))
     else:
@@ -68,21 +66,33 @@ def index():
 def start_game():
     session_id = get_session_id()
     session_data = get_session_data(session_id)
-    # Generate a unique team code
-    team_code = str(uuid.uuid4())[:8]  # Shorten UUID to 8 characters
-    session_data['team_code'] = team_code
+    player_name = request.json.get('player_name', 'Player1')
+    # Generate a unique lobby code
+    lobby_code = generate_lobby_code()
+    session_data['lobby_code'] = lobby_code
+    session_data['player_name'] = player_name
 
     # Initialize game state in Redis
     game_state = {
-        'players': {},
-        'previous_positions': []
+        'players': {player_name: {'x': 0, 'y': 0}},
+        'previous_positions': [],
+        'max_players': 4,  # You can adjust this as needed
+        'player_names': [player_name],
+        'ready_statuses': [False],
+        'game_started': False
     }
-    redis_client.set(team_code, json.dumps(game_state))
+    redis_client.set(lobby_code, json.dumps(game_state))
 
     # Save session data
     save_session_data(session_id, session_data)
 
-    response = jsonify({'team_code': team_code})
+    response = jsonify({
+        'message': 'Lobby created',
+        'lobby_code': lobby_code,
+        'player_names': game_state['player_names'],
+        'ready_statuses': game_state['ready_statuses'],
+        'max_players': game_state['max_players']
+    })
     response.set_cookie('session_id', session_id)
     return response
 
@@ -90,17 +100,43 @@ def start_game():
 def join_game():
     session_id = get_session_id()
     session_data = get_session_data(session_id)
-    team_code = request.json.get('team_code')
-    if not team_code:
-        return jsonify({'status': 'error', 'message': 'No team code provided'}), 400
+    data = request.get_json()
+    lobby_code = data.get('lobby_code')
+    player_name = data.get('player_name', f'Player{uuid.uuid4().hex[:4]}')
+    if not lobby_code:
+        return jsonify({'status': 'error', 'message': 'No lobby code provided'}), 400
 
-    if not redis_client.exists(team_code):
-        return jsonify({'status': 'error', 'message': 'Invalid team code'}), 400
+    game_state_json = redis_client.get(lobby_code)
+    if not game_state_json:
+        return jsonify({'status': 'error', 'message': 'Invalid lobby code'}), 400
 
-    session_data['team_code'] = team_code
+    game_state = json.loads(game_state_json)
+
+    if game_state.get('game_started'):
+        return jsonify({'status': 'error', 'message': 'Game has already started'}), 400
+
+    if len(game_state['player_names']) >= game_state['max_players']:
+        return jsonify({'status': 'error', 'message': 'Lobby is full'}), 400
+
+    # Add player to the game state
+    game_state['players'][player_name] = {'x': 0, 'y': 0}
+    game_state['player_names'].append(player_name)
+    game_state['ready_statuses'].append(False)
+    # Update game state in Redis
+    redis_client.set(lobby_code, json.dumps(game_state))
+
+    # Update session data
+    session_data['lobby_code'] = lobby_code
+    session_data['player_name'] = player_name
     save_session_data(session_id, session_data)
 
-    response = jsonify({'status': 'success'})
+    response = jsonify({
+        'message': f'Joined lobby {lobby_code}',
+        'lobby_code': lobby_code,
+        'player_names': game_state['player_names'],
+        'ready_statuses': game_state['ready_statuses'],
+        'max_players': game_state['max_players']
+    })
     response.set_cookie('session_id', session_id)
     return response
 
@@ -108,7 +144,7 @@ def join_game():
 def game():
     session_id = get_session_id()
     session_data = get_session_data(session_id)
-    if 'team_code' not in session_data:
+    if 'lobby_code' not in session_data:
         return redirect(url_for('index'))
     response = make_response(render_template('game.html'))
     response.set_cookie('session_id', session_id)
@@ -118,32 +154,24 @@ def game():
 def visible_cells():
     session_id = get_session_id()
     session_data = get_session_data(session_id)
-    if 'team_code' not in session_data:
+    if 'lobby_code' not in session_data:
         return jsonify({'status': 'error', 'message': 'Not in a game'}), 400
 
-    team_code = session_data['team_code']
-    player_id = session_data.get('player_id')
+    lobby_code = session_data['lobby_code']
+    player_name = session_data.get('player_name')
 
     # Load game state from Redis
-    game_state_json = redis_client.get(team_code)
+    game_state_json = redis_client.get(lobby_code)
     if not game_state_json:
         return jsonify({'status': 'error', 'message': 'Game state not found'}), 400
 
     game_state = json.loads(game_state_json)
 
     # Get player's position
-    if not player_id or player_id not in game_state['players']:
-        # Assign a new player ID and position
-        player_id = str(uuid.uuid4())
-        session_data['player_id'] = player_id
-        game_state['players'][player_id] = {'x': 0, 'y': 0}
-        # Update game state in Redis
-        redis_client.set(team_code, json.dumps(game_state))
+    if not player_name or player_name not in game_state['players']:
+        return jsonify({'status': 'error', 'message': 'Player not found in game state'}), 400
 
-    # Save session data
-    save_session_data(session_id, session_data)
-
-    player_position = game_state['players'][player_id]
+    player_position = game_state['players'][player_name]
     center_x = player_position['x']
     center_y = player_position['y']
 
@@ -171,7 +199,7 @@ def visible_cells():
         'visibility_range': visibility_range_squares,
         'visible_cells': visible_cells,
         'previous_positions': relative_previous_positions,
-        'team_code': team_code
+        'lobby_code': lobby_code
     })
     response.set_cookie('session_id', session_id)
     return response
@@ -180,28 +208,28 @@ def visible_cells():
 def move():
     session_id = get_session_id()
     session_data = get_session_data(session_id)
-    if 'team_code' not in session_data:
+    if 'lobby_code' not in session_data:
         return jsonify({'status': 'error', 'message': 'Not in a game'}), 400
 
-    team_code = session_data['team_code']
-    player_id = session_data.get('player_id')
+    lobby_code = session_data['lobby_code']
+    player_name = session_data.get('player_name')
 
     direction = request.json.get('direction')
     if not direction:
         return jsonify({'status': 'error', 'message': 'No direction provided'}), 400
 
     # Load game state from Redis
-    game_state_json = redis_client.get(team_code)
+    game_state_json = redis_client.get(lobby_code)
     if not game_state_json:
         return jsonify({'status': 'error', 'message': 'Game state not found'}), 400
 
     game_state = json.loads(game_state_json)
 
     # Get player's position
-    if not player_id or player_id not in game_state['players']:
+    if not player_name or player_name not in game_state['players']:
         return jsonify({'status': 'error', 'message': 'Player not found in game state'}), 400
 
-    player_position = game_state['players'][player_id]
+    player_position = game_state['players'][player_name]
 
     # Update previous positions
     game_state.setdefault('previous_positions', []).append({'x': player_position['x'], 'y': player_position['y']})
@@ -223,7 +251,7 @@ def move():
         game_state['previous_positions'] = game_state['previous_positions'][-100:]
 
     # Update game state in Redis
-    redis_client.set(team_code, json.dumps(game_state))
+    redis_client.set(lobby_code, json.dumps(game_state))
 
     response = jsonify({'status': 'success'})
     response.set_cookie('session_id', session_id)
