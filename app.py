@@ -66,7 +66,8 @@ def index():
 def start_game():
     session_id = get_session_id()
     session_data = get_session_data(session_id)
-    player_name = request.json.get('player_name', 'Player1')
+    data = request.get_json(silent=True) or {}
+    player_name = data.get('player_name', 'Player1')
     # Generate a unique lobby code
     lobby_code = generate_lobby_code()
     session_data['lobby_code'] = lobby_code

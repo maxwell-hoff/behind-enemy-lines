@@ -35,18 +35,21 @@
         <button onclick="startGame()">Start New Game</button>
         <button onclick="showJoinForm()">Join Game</button>
         <div id="join-form">
-            <input type="text" id="team-code-input" placeholder="Enter Team Code">
+            <input type="text" id="lobby-code-input" placeholder="Enter Lobby Code">
             <button onclick="joinGame()">Join</button>
         </div>
     </div>
     <script>
         function startGame() {
+            const playerName = 'Player1'; // Or prompt the user for a name
             fetch('/start_game', {
-                method: 'POST'
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({'player_name': playerName})
             })
             .then(response => response.json())
             .then(data => {
-                if (data.team_code) {
+                if (data.lobby_code) {
                     window.location.href = '/game';
                 } else {
                     alert('Error starting game.');
@@ -62,19 +65,20 @@
         }
 
         function joinGame() {
-            const teamCode = document.getElementById('team-code-input').value.trim();
-            if (!teamCode) {
-                alert('Please enter a team code.');
+            const lobbyCode = document.getElementById('lobby-code-input').value.trim();
+            const playerName = 'Player'; // Or prompt the user for a name
+            if (!lobbyCode) {
+                alert('Please enter a lobby code.');
                 return;
             }
             fetch('/join_game', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({'team_code': teamCode})
+                body: JSON.stringify({'lobby_code': lobbyCode, 'player_name': playerName})
             })
             .then(response => response.json())
             .then(data => {
-                if (data.status === 'success') {
+                if (data.message) {
                     window.location.href = '/game';
                 } else {
                     alert(data.message || 'Error joining game.');

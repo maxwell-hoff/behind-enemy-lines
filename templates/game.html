@@ -48,7 +48,7 @@
     </style>
 </head>
 <body>
-    <div id="team-code-display">Team Code: <span id="team-code"></span></div>
+    <div id="lobby-code-display">Lobby Code: <span id="lobby-code"></span></div>
     <div id="grid-container">
         <div id="controls">
             <div style="display: flex; justify-content: center;">
@@ -83,7 +83,7 @@
                 grid.style.gridTemplateRows = `repeat(${gridSize}, 5px)`;
 
                 // Display team code
-                document.getElementById('team-code').textContent = data.team_code;
+                document.getElementById('lobby-code').textContent = data.lobby_code;
 
                 // Create a Set of visible cell positions for quick lookup
                 const visibleCellsSet = new Set(data.visible_cells.map(cell => `${cell.x},${cell.y}`));
