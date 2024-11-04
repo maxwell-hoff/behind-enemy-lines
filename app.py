@@ -45,39 +45,35 @@ def terrain_height_sine(x, y):
     k = (2 * math.pi) / wavelength
     return A * math.sin(k * x) * math.sin(k * y)
 
-def terrain_gradient_sine(x, y):
+def terrain_height_sine(x, y):
     A = 500
     wavelength = 200
     k = (2 * math.pi) / wavelength
-    dh_dx = A * k * math.cos(k * x) * math.sin(k * y)
-    dh_dy = A * k * math.sin(k * x) * math.cos(k * y)
-    return dh_dx, dh_dy
+    terrain_elevation = A * math.sin(k * x) * math.sin(k * y) + 500  # Add 500 ft offset
+    return terrain_elevation
 
 def terrain_height_perlin(x, y):
-    # Perlin noise terrain
-    A = 500  # Increased amplitude
+    A = 500
     scale = PERLIN_SCALE
-    # Generate noise value between -1 and 1
     noise_value = noise.pnoise2(x * scale, y * scale)
-    return A * noise_value
+    terrain_elevation = A * noise_value + 500  # Add 500 ft offset
+    return terrain_elevation
 
 def terrain_height_mountains(x, y):
     A = MOUNTAIN_PEAK_HEIGHT
     scale = MOUNTAIN_SCALE
-    # Perlin noise for base terrain
     base_height = noise.pnoise2(x * scale, y * scale)
-    # Random peaks
     peaks = [
         {'x': 100, 'y': 100, 'height': A},
         {'x': -150, 'y': 50, 'height': A * 0.8},
         {'x': 200, 'y': -200, 'height': A * 1.2},
-        # Add more peaks as desired
     ]
     peak_height = 0
     for peak in peaks:
         distance_sq = (x - peak['x'])**2 + (y - peak['y'])**2
         peak_height += peak['height'] * math.exp(-distance_sq / (2 * (50**2)))
-    return base_height * 500 + peak_height  # Increased base terrain variation
+    terrain_elevation = base_height * 500 + peak_height + 500  # Add 500 ft offset
+    return terrain_elevation
 
 def terrain_gradient_perlin(x, y):
     A = 500
@@ -117,6 +113,8 @@ def terrain_gradient(x, y, terrain_type):
         return terrain_gradient_sine(x, y)
 
 def horizon_distance(viewer_elevation_ft):
+    # Set minimum viewer elevation to VIEWER_HEIGHT_FT (6 ft)
+    viewer_elevation_ft = max(viewer_elevation_ft, VIEWER_HEIGHT_FT)
     return 1.22 * math.sqrt(viewer_elevation_ft)
 
 def line_of_sight_visibility(center_x, center_y, terrain_type):
