@@ -28,7 +28,7 @@ SQUARE_SIZE_MILES = 0.1
 # Calculate visibility range
 def get_visibility_range():
     horizon_distance_miles = 1.22 * math.sqrt(VIEWER_HEIGHT_FT)
-    tilt_angle_degrees = 15  # Tilt angle
+    tilt_angle_degrees = 30  # Tilt angle
     tilt_angle_radians = math.radians(tilt_angle_degrees)
     cos_theta = math.cos(tilt_angle_radians)
     sec_theta = 1 / cos_theta
