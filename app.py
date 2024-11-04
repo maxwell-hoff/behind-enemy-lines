@@ -25,11 +25,45 @@ redis_client = redis.Redis.from_url(
 VIEWER_HEIGHT_FT = 6
 SQUARE_SIZE_MILES = 0.1
 
+def terrain_height(x, y):
+    # Amplitude of the hills (in feet)
+    A = 10  # Reduced maximum height variation
+    # Wavelength of the hills (in squares)
+    wavelength = 200  # Increased wavelength for gradual slopes
+    # Convert x and y to radians for the sine function
+    k = (2 * math.pi) / wavelength
+    # Terrain height function
+    return A * math.sin(k * x) * math.sin(k * y)
+
+def terrain_gradient(x, y):
+    A = 10
+    wavelength = 200
+    k = (2 * math.pi) / wavelength
+    # Partial derivatives (slopes in x and y)
+    dh_dx = A * k * math.cos(k * x) * math.sin(k * y)
+    dh_dy = A * k * math.sin(k * x) * math.cos(k * y)
+    return dh_dx, dh_dy
+
+def tilt_angle(x, y):
+    dh_dx, dh_dy = terrain_gradient(x, y)
+    # Gradient magnitude
+    gradient_magnitude = math.sqrt(dh_dx**2 + dh_dy**2)
+    # Tilt angle in radians
+    theta = math.atan(gradient_magnitude)
+    # Limit the tilt angle to a maximum of 15 degrees (converted to radians)
+    max_tilt_radians = math.radians(15)
+    if theta > max_tilt_radians:
+        theta = max_tilt_radians
+    return theta
+
+def tilt_direction(x, y):
+    dh_dx, dh_dy = terrain_gradient(x, y)
+    # Direction angle in radians (0 = east, pi/2 = north)
+    phi = math.atan2(dh_dy, dh_dx)
+    return phi
+
 # Calculate visibility range
 def get_visibility_range(x, y):
-    VIEWER_HEIGHT_FT = 6  # Viewer height
-    SQUARE_SIZE_MILES = 0.1  # Size of each square in miles
-
     # Compute tilt angle at the current position
     theta = tilt_angle(x, y)
     sin_theta = math.sin(theta)
@@ -46,7 +80,7 @@ def get_visibility_range(x, y):
     phi = tilt_direction(x, y)
     return a_squares, b_squares, phi
 
-# Session management functions
+# Session management functions (unchanged)
 def get_session_id():
     session_id = request.cookies.get('session_id')
     if not session_id:
@@ -70,43 +104,10 @@ def generate_lobby_code():
         if not redis_client.exists(lobby_code):
             return lobby_code
 
-def terrain_height(x, y):
-    # Amplitude of the hills (in feet)
-    A = 30  # Maximum height variation
-    # Wavelength of the hills (in squares)
-    wavelength = 50  # Adjust as needed
-    # Convert x and y to radians for the sine function
-    k = (2 * math.pi) / wavelength
-    # Terrain height function
-    return A * math.sin(k * x) * math.sin(k * y)
-
-def terrain_gradient(x, y):
-    A = 30
-    wavelength = 50
-    k = (2 * math.pi) / wavelength
-    # Partial derivatives (slopes in x and y)
-    dh_dx = A * k * math.cos(k * x) * math.sin(k * y)
-    dh_dy = A * k * math.sin(k * x) * math.cos(k * y)
-    return dh_dx, dh_dy
-
-def tilt_angle(x, y):
-    dh_dx, dh_dy = terrain_gradient(x, y)
-    # Gradient magnitude
-    gradient_magnitude = math.sqrt(dh_dx**2 + dh_dy**2)
-    # Tilt angle in radians
-    theta = math.atan(gradient_magnitude)
-    return theta
-
-def tilt_direction(x, y):
-    dh_dx, dh_dy = terrain_gradient(x, y)
-    # Direction angle in radians (0 = east, pi/2 = north)
-    phi = math.atan2(dh_dy, dh_dx)
-    return phi
-
+# Routes (unchanged except for '/visible_cells')
 @app.route('/')
 def index():
     session_id = get_session_id()
-    # Always render index.html
     response = make_response(render_template('index.html'))
     response.set_cookie('session_id', session_id)
     return response
@@ -116,22 +117,19 @@ def start_game():
     session_id = get_session_id()
     data = request.get_json(silent=True) or {}
     player_name = data.get('player_name', 'Player1')
-    # Generate a unique lobby code
     lobby_code = generate_lobby_code()
     session_data = {'lobby_code': lobby_code, 'player_name': player_name}
 
-    # Initialize game state in Redis
     game_state = {
         'position': {'x': 0, 'y': 0},
         'previous_positions': [],
-        'max_players': 4,  # You can adjust this as needed
+        'max_players': 4,
         'player_names': [player_name],
         'ready_statuses': [False],
         'game_started': False
     }
-    redis_client.set(lobby_code, json.dumps(game_state), ex=3600)  # Expires in 1 hour
+    redis_client.set(lobby_code, json.dumps(game_state), ex=3600)
 
-    # Save session data
     save_session_data(session_id, session_data)
 
     response = jsonify({
@@ -165,13 +163,10 @@ def join_game():
     if len(game_state['player_names']) >= game_state['max_players']:
         return jsonify({'status': 'error', 'message': 'Lobby is full'}), 400
 
-    # Add player to the game state
     game_state['player_names'].append(player_name)
     game_state['ready_statuses'].append(False)
-    # Update game state in Redis
-    redis_client.set(lobby_code, json.dumps(game_state), ex=3600)  # Reset expiration time
+    redis_client.set(lobby_code, json.dumps(game_state), ex=3600)
 
-    # Update session data
     session_data = {'lobby_code': lobby_code, 'player_name': player_name}
     save_session_data(session_id, session_data)
 
@@ -204,7 +199,6 @@ def visible_cells():
 
     lobby_code = session_data['lobby_code']
 
-    # Load game state from Redis
     game_state_json = redis_client.get(lobby_code)
     if not game_state_json:
         return jsonify({'status': 'error', 'message': 'Game state not found'}), 400
@@ -226,7 +220,7 @@ def visible_cells():
     visible_cells = []
 
     # Determine the grid boundaries
-    max_range = max(a_squares, b_squares)
+    max_range = max(a_squares, b_squares, 10)  # Ensure a minimum grid size
     for y in range(center_y - max_range, center_y + max_range + 1):
         for x in range(center_x - max_range, center_x + max_range + 1):
             dx = x - center_x
@@ -268,7 +262,6 @@ def move():
     if not direction:
         return jsonify({'status': 'error', 'message': 'No direction provided'}), 400
 
-    # Load game state from Redis
     game_state_json = redis_client.get(lobby_code)
     if not game_state_json:
         return jsonify({'status': 'error', 'message': 'Game state not found'}), 400
@@ -297,7 +290,7 @@ def move():
         game_state['previous_positions'] = game_state['previous_positions'][-100:]
 
     # Update game state in Redis
-    redis_client.set(lobby_code, json.dumps(game_state), ex=3600)  # Reset expiration time
+    redis_client.set(lobby_code, json.dumps(game_state), ex=3600)
 
     response = jsonify({'status': 'success'})
     response.set_cookie('session_id', session_id)
@@ -307,7 +300,6 @@ def move():
 def leave_game():
     session_id = get_session_id()
     session_data = get_session_data(session_id)
-    # Remove 'lobby_code' and 'player_name' from session data
     session_data.pop('lobby_code', None)
     session_data.pop('player_name', None)
     save_session_data(session_id, session_data)
@@ -316,5 +308,5 @@ def leave_game():
     return response
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))  # Use the PORT environment variable if available
-    app.run(debug=False, host='0.0.0.0', port=port)  # Listen on all interfaces
+    port = int(os.environ.get('PORT', 5000))
+    app.run(debug=False, host='0.0.0.0', port=port)
