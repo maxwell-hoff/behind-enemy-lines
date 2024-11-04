@@ -63,13 +63,21 @@ def terrain_height_perlin(x, y):
     return A * noise_value
 
 def terrain_height_mountains(x, y):
-    # Mountains terrain using Perlin noise and Gaussian peaks
     A = MOUNTAIN_PEAK_HEIGHT
     scale = MOUNTAIN_SCALE
     # Perlin noise for base terrain
     base_height = noise.pnoise2(x * scale, y * scale)
-    # Gaussian function to create peaks
-    peak_height = A * math.exp(-((x - 100)**2 + (y - 100)**2) / (2 * (50**2)))
+    # Random peaks
+    peaks = [
+        {'x': 100, 'y': 100, 'height': A},
+        {'x': -150, 'y': 50, 'height': A * 0.8},
+        {'x': 200, 'y': -200, 'height': A * 1.2},
+        # Add more peaks as desired
+    ]
+    peak_height = 0
+    for peak in peaks:
+        distance_sq = (x - peak['x'])**2 + (y - peak['y'])**2
+        peak_height += peak['height'] * math.exp(-distance_sq / (2 * (50**2)))
     return base_height * 10 + peak_height
 
 def terrain_gradient_perlin(x, y):
@@ -128,7 +136,8 @@ def line_of_sight_visibility(center_x, center_y, terrain_type):
 
         prev_max_angle = -math.inf
 
-        for d in range(1, MAX_VIEW_DISTANCE_SQUARES + 1):
+        # Start from d = 0 to include the center cell
+        for d in range(0, MAX_VIEW_DISTANCE_SQUARES + 1):
             x = center_x + d * cos_theta
             y = center_y + d * sin_theta
 
@@ -139,7 +148,7 @@ def line_of_sight_visibility(center_x, center_y, terrain_type):
             # Calculate elevation angle to the point
             target_elevation = terrain_height(x, y, terrain_type)
             delta_h = (target_elevation - viewer_elevation) * VERTICAL_SCALE
-            distance = d * SQUARE_SIZE_MILES * 5280  # Convert miles to feet
+            distance = max(d * SQUARE_SIZE_MILES * 5280, 1)  # Prevent division by zero
             elevation_angle = math.degrees(math.atan2(delta_h, distance))
 
             if elevation_angle > prev_max_angle:

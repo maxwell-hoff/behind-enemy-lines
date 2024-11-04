@@ -17,13 +17,10 @@
         #grid {
             display: grid;
             grid-gap: 1px;
-            /* grid-template-columns and rows will be set dynamically */
-            max-width: 800px; /* Adjust as needed */
-            max-height: 800px; /* Adjust as needed */
-            overflow: auto;
+            transform-origin: center;
         }
         .cell {
-            width: 3px;  /* Reduce cell size */
+            width: 3px;  /* Adjust as needed */
             height: 3px;
             background-color: grey;
         }
@@ -81,6 +78,11 @@
         <div id="grid"></div>
     </div>
     <script>
+        const cellWidth = 3; // Same as in CSS
+        const cellHeight = 3;
+        const gridGap = 1; // Same as in CSS
+        const controlsHeight = 100; // Adjust based on your controls' height
+
         function updateGrid() {
             fetch('/visible_cells')
             .then(response => response.json())
@@ -109,8 +111,8 @@
                 // Set grid template columns and rows
                 const grid = document.getElementById('grid');
                 grid.innerHTML = ''; // Clear previous content
-                grid.style.gridTemplateColumns = `repeat(${gridSizeX}, 5px)`;
-                grid.style.gridTemplateRows = `repeat(${gridSizeY}, 5px)`;
+                grid.style.gridTemplateColumns = `repeat(${gridSizeX}, ${cellWidth}px)`;
+                grid.style.gridTemplateRows = `repeat(${gridSizeY}, ${cellHeight}px)`;
 
                 // Display lobby code
                 document.getElementById('lobby-code').textContent = data.lobby_code;
@@ -143,14 +145,29 @@
                             }
                         } else {
                             // Invisible cell to maintain grid structure
-                            cell.style.width = '5px';
-                            cell.style.height = '5px';
+                            cell.style.width = `${cellWidth}px`;
+                            cell.style.height = `${cellHeight}px`;
                             cell.style.visibility = 'hidden';
                         }
 
                         grid.appendChild(cell);
                     }
                 }
+
+                // Calculate scaling factor
+                const gridContainer = document.getElementById('grid-container');
+                const gridWidth = gridSizeX * (cellWidth + gridGap);
+                const gridHeight = gridSizeY * (cellHeight + gridGap);
+
+                const containerWidth = window.innerWidth;
+                const containerHeight = window.innerHeight - controlsHeight; // Adjust for controls
+
+                const scaleX = containerWidth / gridWidth;
+                const scaleY = containerHeight / gridHeight;
+                const scale = Math.min(scaleX, scaleY, 1); // Don't scale up
+
+                grid.style.transform = `scale(${scale})`;
+                grid.style.transformOrigin = 'center';
             })
             .catch(error => {
                 console.error('Error fetching visible cells:', error);
