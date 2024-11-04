@@ -3,16 +3,15 @@
 <head>
     <title>Flat Surface Horizon Grid - Game</title>
     <style>
-        /* Your existing styles */
+        /* Existing styles */
         body, html {
             height: 100%;
             margin: 0;
         }
         #grid-container {
             display: flex;
-            flex-direction: column;
-            justify-content: center; /* Center vertically */
-            align-items: center;     /* Center horizontally */
+            justify-content: center; /* Center horizontally */
+            align-items: center;     /* Center vertically */
             height: 100%;
         }
         #grid {
@@ -31,37 +30,51 @@
         .previous {
             background-color: lightgrey;
         }
+        /* New styles for the controls */
         #controls {
-            margin-bottom: 10px;
+            position: fixed;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1; /* Ensure controls are above other elements */
         }
         #controls button {
             margin: 2px;
         }
+        /* Style for the Leave Game button */
+        #leave-button {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            z-index: 1;
+        }
         #lobby-code-display {
-            position: absolute;
+            position: fixed;
             top: 10px;
             right: 10px;
             font-size: 14px;
             background-color: white;
             padding: 5px;
             border: 1px solid black;
+            z-index: 1;
         }
     </style>
 </head>
 <body>
     <div id="lobby-code-display">Lobby Code: <span id="lobby-code"></span></div>
-    <button onclick="leaveGame()">Leave Game</button>
-    <div id="grid-container">
-        <div id="controls">
-            <div style="display: flex; justify-content: center;">
-                <button onclick="move('up')">Up</button>
-            </div>
-            <div style="display: flex; justify-content: center;">
-                <button onclick="move('left')">Left</button>
-                <button onclick="move('down')">Down</button>
-                <button onclick="move('right')">Right</button>
-            </div>
+    <button id="leave-button" onclick="leaveGame()">Leave Game</button>
+    <!-- Move controls outside of grid-container -->
+    <div id="controls">
+        <div style="display: flex; justify-content: center;">
+            <button onclick="move('up')">Up</button>
         </div>
+        <div style="display: flex; justify-content: center;">
+            <button onclick="move('left')">Left</button>
+            <button onclick="move('down')">Down</button>
+            <button onclick="move('right')">Right</button>
+        </div>
+    </div>
+    <div id="grid-container">
         <div id="grid"></div>
     </div>
     <script>
