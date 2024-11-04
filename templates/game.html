@@ -3,15 +3,14 @@
 <head>
     <title>Flat Surface Horizon Grid - Game</title>
     <style>
-        /* Existing styles */
         body, html {
             height: 100%;
             margin: 0;
         }
         #grid-container {
             display: flex;
-            justify-content: center; /* Center horizontally */
-            align-items: center;     /* Center vertically */
+            justify-content: center;
+            align-items: center;
             height: 100%;
         }
         #grid {
@@ -20,9 +19,9 @@
             transform-origin: center;
         }
         .cell {
-            width: 3px;  /* Adjust as needed */
+            width: 3px;
             height: 3px;
-            background-color: grey;
+            /* Removed background-color */
         }
         .center {
             background-color: orange;
@@ -30,18 +29,16 @@
         .previous {
             background-color: lightgrey;
         }
-        /* New styles for the controls */
         #controls {
             position: fixed;
             top: 10px;
             left: 50%;
             transform: translateX(-50%);
-            z-index: 1; /* Ensure controls are above other elements */
+            z-index: 1;
         }
         #controls button {
             margin: 2px;
         }
-        /* Style for the Leave Game button */
         #leave-button {
             position: fixed;
             top: 10px;
@@ -63,7 +60,6 @@
 <body>
     <div id="lobby-code-display">Lobby Code: <span id="lobby-code"></span></div>
     <button id="leave-button" onclick="leaveGame()">Leave Game</button>
-    <!-- Move controls outside of grid-container -->
     <div id="controls">
         <div style="display: flex; justify-content: center;">
             <button onclick="move('up')">Up</button>
@@ -73,15 +69,23 @@
             <button onclick="move('down')">Down</button>
             <button onclick="move('right')">Right</button>
         </div>
+        <!-- Dropdown menu for display mode -->
+        <div style="margin-top: 10px;">
+            <label for="display-mode">Display Mode:</label>
+            <select id="display-mode" onchange="updateGrid()">
+                <option value="standard">Standard</option>
+                <option value="topographic">Topographic</option>
+            </select>
+        </div>
     </div>
     <div id="grid-container">
         <div id="grid"></div>
     </div>
     <script>
-        const cellWidth = 3; // Same as in CSS
+        const cellWidth = 3;
         const cellHeight = 3;
-        const gridGap = 1; // Same as in CSS
-        const controlsHeight = 100; // Adjust based on your controls' height
+        const gridGap = 1;
+        const controlsHeight = 100;
 
         function updateGrid() {
             fetch('/visible_cells')
@@ -95,8 +99,8 @@
 
                 const visibleCells = data.visible_cells;
                 const previousPositions = data.previous_positions;
+                const displayMode = document.getElementById('display-mode').value;
 
-                // Determine grid size based on visible cells
                 let minX = 0, maxX = 0, minY = 0, maxY = 0;
                 visibleCells.forEach(cell => {
                     if (cell.x < minX) minX = cell.x;
@@ -108,22 +112,28 @@
                 const gridSizeX = maxX - minX + 1;
                 const gridSizeY = maxY - minY + 1;
 
-                // Set grid template columns and rows
                 const grid = document.getElementById('grid');
-                grid.innerHTML = ''; // Clear previous content
+                grid.innerHTML = '';
                 grid.style.gridTemplateColumns = `repeat(${gridSizeX}, ${cellWidth}px)`;
                 grid.style.gridTemplateRows = `repeat(${gridSizeY}, ${cellHeight}px)`;
 
-                // Display lobby code
                 document.getElementById('lobby-code').textContent = data.lobby_code;
 
-                // Create a Map of visible cell positions for quick lookup
-                const visibleCellsMap = new Map();
+                // Find min and max elevations
+                let minElevation = Infinity;
+                let maxElevation = -Infinity;
                 visibleCells.forEach(cell => {
-                    visibleCellsMap.set(`${cell.x},${cell.y}`, cell);
+                    if (cell.elevation < minElevation) minElevation = cell.elevation;
+                    if (cell.elevation > maxElevation) maxElevation = cell.elevation;
                 });
 
-                // Create a Set of previous positions
+                // Create a Map of visible cell positions and elevations
+                const visibleCellsMap = new Map();
+                visibleCells.forEach(cell => {
+                    const key = `${cell.x},${cell.y}`;
+                    visibleCellsMap.set(key, cell);
+                });
+
                 const previousPositionsSet = new Set(previousPositions.map(pos => `${pos.x},${pos.y}`));
 
                 for (let y = minY; y <= maxY; y++) {
@@ -131,20 +141,26 @@
                         const cell = document.createElement('div');
 
                         const cellKey = `${x},${y}`;
-                        // Check if the cell is in the set of visible cells
                         if (visibleCellsMap.has(cellKey)) {
+                            const cellData = visibleCellsMap.get(cellKey);
                             cell.classList.add('cell');
 
-                            // Center cell
                             if (x === 0 && y === 0) {
                                 cell.classList.add('center');
-                                cell.classList.remove('previous'); // Ensure center cell takes priority
+                                cell.style.backgroundColor = 'orange';
                             } else if (previousPositionsSet.has(cellKey)) {
-                                // Previous position
                                 cell.classList.add('previous');
+                                cell.style.backgroundColor = 'lightgrey';
+                            } else {
+                                if (displayMode === 'topographic') {
+                                    const elevation = cellData.elevation;
+                                    const color = getColorForElevation(elevation, minElevation, maxElevation);
+                                    cell.style.backgroundColor = color;
+                                } else {
+                                    cell.style.backgroundColor = 'grey';
+                                }
                             }
                         } else {
-                            // Invisible cell to maintain grid structure
                             cell.style.width = `${cellWidth}px`;
                             cell.style.height = `${cellHeight}px`;
                             cell.style.visibility = 'hidden';
@@ -154,17 +170,17 @@
                     }
                 }
 
-                // Calculate scaling factor
+                // Scaling code remains the same
                 const gridContainer = document.getElementById('grid-container');
                 const gridWidth = gridSizeX * (cellWidth + gridGap);
                 const gridHeight = gridSizeY * (cellHeight + gridGap);
 
                 const containerWidth = window.innerWidth;
-                const containerHeight = window.innerHeight - controlsHeight; // Adjust for controls
+                const containerHeight = window.innerHeight - controlsHeight;
 
                 const scaleX = containerWidth / gridWidth;
                 const scaleY = containerHeight / gridHeight;
-                const scale = Math.min(scaleX, scaleY, 1); // Don't scale up
+                const scale = Math.min(scaleX, scaleY, 1);
 
                 grid.style.transform = `scale(${scale})`;
                 grid.style.transformOrigin = 'center';
@@ -172,6 +188,12 @@
             .catch(error => {
                 console.error('Error fetching visible cells:', error);
             });
+        }
+
+        function getColorForElevation(elevation, minElevation, maxElevation) {
+            const ratio = (elevation - minElevation) / (maxElevation - minElevation);
+            const hue = (1 - ratio) * 240;
+            return `hsl(${hue}, 100%, 50%)`;
         }
 
         function move(direction) {
@@ -214,7 +236,7 @@
         updateGrid();
 
         // Periodically update the grid
-        setInterval(updateGrid, 1000); // Update every second
+        setInterval(updateGrid, 1000);
     </script>
 </body>
 </html>

@@ -141,19 +141,22 @@ def line_of_sight_visibility(center_x, center_y, terrain_type):
             x = center_x + d * cos_theta
             y = center_y + d * sin_theta
 
-            # Get integer coordinates for grid
             x_int = int(round(x))
             y_int = int(round(y))
 
-            # Calculate elevation angle to the point
             target_elevation = terrain_height(x, y, terrain_type)
             delta_h = (target_elevation - viewer_elevation) * VERTICAL_SCALE
-            distance = max(d * SQUARE_SIZE_MILES * 5280, 1)  # Prevent division by zero
+            distance = max(d * SQUARE_SIZE_MILES * 5280, 1)
             elevation_angle = math.degrees(math.atan2(delta_h, distance))
 
             if elevation_angle > prev_max_angle:
                 # Point is visible
-                visible_cells.append({'x': x_int - center_x, 'y': y_int - center_y})
+                cell_elevation = target_elevation
+                visible_cells.append({
+                    'x': x_int - center_x,
+                    'y': y_int - center_y,
+                    'elevation': cell_elevation
+                })
                 prev_max_angle = elevation_angle
 
     return visible_cells
@@ -342,13 +345,16 @@ def visible_cells():
                 dx = x - center_x
                 dy = y - center_y
 
-                # Rotate coordinates to align with the ellipse axes
                 x_rot = dx * cos_phi + dy * sin_phi
                 y_rot = -dx * sin_phi + dy * cos_phi
 
-                # Check if the point is within the ellipse
                 if (x_rot / a_squares) ** 2 + (y_rot / b_squares) ** 2 <= 1:
-                    visible_cells.append({'x': dx, 'y': dy})
+                    cell_elevation = terrain_height(x, y, terrain_type)
+                    visible_cells.append({
+                        'x': dx,
+                        'y': dy,
+                        'elevation': cell_elevation
+                    })
 
     # Prepare previous positions relative to the current position
     relative_previous_positions = []
