@@ -74,12 +74,21 @@
                     window.location.href = '/';
                     return;
                 }
-                const visibilityRangeX = data.visibility_range_x;
-                const visibilityRangeY = data.visibility_range_y;
-                const gridSizeX = visibilityRangeX * 2 + 1; // Total grid size in x-direction
-                const gridSizeY = visibilityRangeY * 2 + 1; // Total grid size in y-direction
-                const halfGridX = visibilityRangeX;
-                const halfGridY = visibilityRangeY;
+
+                const visibleCells = data.visible_cells;
+                const previousPositions = data.previous_positions;
+
+                // Determine grid size based on visible cells
+                let minX = 0, maxX = 0, minY = 0, maxY = 0;
+                visibleCells.forEach(cell => {
+                    if (cell.x < minX) minX = cell.x;
+                    if (cell.x > maxX) maxX = cell.x;
+                    if (cell.y < minY) minY = cell.y;
+                    if (cell.y > maxY) maxY = cell.y;
+                });
+
+                const gridSizeX = maxX - minX + 1;
+                const gridSizeY = maxY - minY + 1;
 
                 // Set grid template columns and rows
                 const grid = document.getElementById('grid');
@@ -90,25 +99,29 @@
                 // Display lobby code
                 document.getElementById('lobby-code').textContent = data.lobby_code;
 
-                // Create a Set of visible cell positions for quick lookup
-                const visibleCellsSet = new Set(data.visible_cells.map(cell => `${cell.x},${cell.y}`));
+                // Create a Map of visible cell positions for quick lookup
+                const visibleCellsMap = new Map();
+                visibleCells.forEach(cell => {
+                    visibleCellsMap.set(`${cell.x},${cell.y}`, cell);
+                });
 
                 // Create a Set of previous positions
-                const previousPositionsSet = new Set(data.previous_positions.map(pos => `${pos.x},${pos.y}`));
+                const previousPositionsSet = new Set(previousPositions.map(pos => `${pos.x},${pos.y}`));
 
-                for (let y = -halfGridY; y <= halfGridY; y++) {
-                    for (let x = -halfGridX; x <= halfGridX; x++) {
+                for (let y = minY; y <= maxY; y++) {
+                    for (let x = minX; x <= maxX; x++) {
                         const cell = document.createElement('div');
 
+                        const cellKey = `${x},${y}`;
                         // Check if the cell is in the set of visible cells
-                        if (visibleCellsSet.has(`${x},${y}`)) {
+                        if (visibleCellsMap.has(cellKey)) {
                             cell.classList.add('cell');
 
                             // Center cell
                             if (x === 0 && y === 0) {
                                 cell.classList.add('center');
                                 cell.classList.remove('previous'); // Ensure center cell takes priority
-                            } else if (previousPositionsSet.has(`${x},${y}`)) {
+                            } else if (previousPositionsSet.has(cellKey)) {
                                 // Previous position
                                 cell.classList.add('previous');
                             }

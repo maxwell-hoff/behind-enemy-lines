@@ -26,21 +26,25 @@ VIEWER_HEIGHT_FT = 6
 SQUARE_SIZE_MILES = 0.1
 
 # Calculate visibility range
-def get_visibility_range():
-    horizon_distance_miles = 1.22 * math.sqrt(VIEWER_HEIGHT_FT)
-    tilt_angle_degrees = 30  # Tilt angle
-    tilt_angle_radians = math.radians(tilt_angle_degrees)
-    cos_theta = math.cos(tilt_angle_radians)
-    sec_theta = 1 / cos_theta
+def get_visibility_range(x, y):
+    VIEWER_HEIGHT_FT = 6  # Viewer height
+    SQUARE_SIZE_MILES = 0.1  # Size of each square in miles
 
-    # Semi-major and semi-minor axes
-    a_miles = horizon_distance_miles * sec_theta
-    b_miles = horizon_distance_miles * cos_theta
+    # Compute tilt angle at the current position
+    theta = tilt_angle(x, y)
+    sin_theta = math.sin(theta)
+
+    # Compute horizon distances in downhill and uphill directions
+    d_downhill_miles = 1.22 * math.sqrt(VIEWER_HEIGHT_FT * (1 + sin_theta))
+    d_uphill_miles = 1.22 * math.sqrt(VIEWER_HEIGHT_FT * (1 - sin_theta))
 
     # Convert distances to squares
-    a_squares = int(a_miles / SQUARE_SIZE_MILES)
-    b_squares = int(b_miles / SQUARE_SIZE_MILES)
-    return a_squares, b_squares
+    a_squares = int(d_downhill_miles / SQUARE_SIZE_MILES)
+    b_squares = int(d_uphill_miles / SQUARE_SIZE_MILES)
+
+    # Return visibility ranges and tilt direction
+    phi = tilt_direction(x, y)
+    return a_squares, b_squares, phi
 
 # Session management functions
 def get_session_id():
@@ -65,6 +69,39 @@ def generate_lobby_code():
         lobby_code = ''.join(random.choices(string.ascii_lowercase + string.digits, k=6))
         if not redis_client.exists(lobby_code):
             return lobby_code
+
+def terrain_height(x, y):
+    # Amplitude of the hills (in feet)
+    A = 30  # Maximum height variation
+    # Wavelength of the hills (in squares)
+    wavelength = 50  # Adjust as needed
+    # Convert x and y to radians for the sine function
+    k = (2 * math.pi) / wavelength
+    # Terrain height function
+    return A * math.sin(k * x) * math.sin(k * y)
+
+def terrain_gradient(x, y):
+    A = 30
+    wavelength = 50
+    k = (2 * math.pi) / wavelength
+    # Partial derivatives (slopes in x and y)
+    dh_dx = A * k * math.cos(k * x) * math.sin(k * y)
+    dh_dy = A * k * math.sin(k * x) * math.cos(k * y)
+    return dh_dx, dh_dy
+
+def tilt_angle(x, y):
+    dh_dx, dh_dy = terrain_gradient(x, y)
+    # Gradient magnitude
+    gradient_magnitude = math.sqrt(dh_dx**2 + dh_dy**2)
+    # Tilt angle in radians
+    theta = math.atan(gradient_magnitude)
+    return theta
+
+def tilt_direction(x, y):
+    dh_dx, dh_dy = terrain_gradient(x, y)
+    # Direction angle in radians (0 = east, pi/2 = north)
+    phi = math.atan2(dh_dy, dh_dx)
+    return phi
 
 @app.route('/')
 def index():
@@ -179,19 +216,28 @@ def visible_cells():
     center_y = position['y']
 
     # Get the adjusted visibility ranges
-    a_squares, b_squares = get_visibility_range()
-    half_grid_x = a_squares
-    half_grid_y = b_squares
+    a_squares, b_squares, phi = get_visibility_range(center_x, center_y)
 
-    # Compute the positions of cells within the elliptical visibility range
+    # Rotate the ellipse to align with the tilt direction
+    cos_phi = math.cos(phi)
+    sin_phi = math.sin(phi)
+
+    # Prepare visible cells
     visible_cells = []
-    for y in range(center_y - half_grid_y, center_y + half_grid_y + 1):
-        for x in range(center_x - half_grid_x, center_x + half_grid_x + 1):
+
+    # Determine the grid boundaries
+    max_range = max(a_squares, b_squares)
+    for y in range(center_y - max_range, center_y + max_range + 1):
+        for x in range(center_x - max_range, center_x + max_range + 1):
             dx = x - center_x
             dy = y - center_y
-            # Ellipse equation
-            if (dx / a_squares) ** 2 + (dy / b_squares) ** 2 <= 1:
-                # Positions are relative to the current position
+
+            # Rotate coordinates to align with the ellipse axes
+            x_rot = dx * cos_phi + dy * sin_phi
+            y_rot = -dx * sin_phi + dy * cos_phi
+
+            # Check if the point is within the ellipse
+            if (x_rot / a_squares) ** 2 + (y_rot / b_squares) ** 2 <= 1:
                 visible_cells.append({'x': dx, 'y': dy})
 
     # Prepare previous positions relative to the current position
@@ -202,8 +248,6 @@ def visible_cells():
         relative_previous_positions.append({'x': rel_x, 'y': rel_y})
 
     response = jsonify({
-        'visibility_range_x': a_squares,
-        'visibility_range_y': b_squares,
         'visible_cells': visible_cells,
         'previous_positions': relative_previous_positions,
         'lobby_code': lobby_code
