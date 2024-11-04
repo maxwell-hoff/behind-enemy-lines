@@ -39,13 +39,6 @@ MOUNTAIN_PEAK_HEIGHT = 500  # Increased height of the mountain peaks
 MOUNTAIN_SCALE = 0.01  # Controls the size of the mountains
 
 def terrain_height_sine(x, y):
-    # Sine wave terrain
-    A = 500  # Increased amplitude
-    wavelength = 200
-    k = (2 * math.pi) / wavelength
-    return A * math.sin(k * x) * math.sin(k * y)
-
-def terrain_height_sine(x, y):
     A = 500
     wavelength = 200
     k = (2 * math.pi) / wavelength
@@ -115,7 +108,11 @@ def terrain_gradient(x, y, terrain_type):
 def horizon_distance(viewer_elevation_ft):
     # Set minimum viewer elevation to VIEWER_HEIGHT_FT (6 ft)
     viewer_elevation_ft = max(viewer_elevation_ft, VIEWER_HEIGHT_FT)
-    return 1.22 * math.sqrt(viewer_elevation_ft)
+    # Calculate the standard horizon distance
+    calculated_distance = 1.22 * math.sqrt(viewer_elevation_ft)
+    # Limit the horizon distance to a maximum of 10 miles
+    max_horizon_distance = 10  # in miles
+    return min(calculated_distance, max_horizon_distance)
 
 def line_of_sight_visibility(center_x, center_y, terrain_type):
     VERTICAL_SCALE = 1  # Adjust vertical exaggeration
