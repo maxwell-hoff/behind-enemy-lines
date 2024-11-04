@@ -7,6 +7,7 @@ from redis.connection import SSLConnection
 import uuid
 import random
 import string
+import noise  # Import the noise library
 
 app = Flask(__name__)
 
@@ -25,59 +26,77 @@ redis_client = redis.Redis.from_url(
 VIEWER_HEIGHT_FT = 6
 SQUARE_SIZE_MILES = 0.1
 
-def terrain_height(x, y):
-    # Amplitude of the hills (in feet)
-    A = 10  # Reduced maximum height variation
-    # Wavelength of the hills (in squares)
-    wavelength = 200  # Increased wavelength for gradual slopes
-    # Convert x and y to radians for the sine function
-    k = (2 * math.pi) / wavelength
-    # Terrain height function
-    return A * math.sin(k * x) * math.sin(k * y)
+# Terrain types
+TERRAIN_SINE = 'sine'
+TERRAIN_PERLIN = 'perlin'
 
-def terrain_gradient(x, y):
+# Define the scale for Perlin noise
+PERLIN_SCALE = 0.05  # Adjust as needed
+
+def terrain_height_sine(x, y):
+    # Sine wave terrain
     A = 10
     wavelength = 200
     k = (2 * math.pi) / wavelength
-    # Partial derivatives (slopes in x and y)
+    return A * math.sin(k * x) * math.sin(k * y)
+
+def terrain_gradient_sine(x, y):
+    A = 10
+    wavelength = 200
+    k = (2 * math.pi) / wavelength
     dh_dx = A * k * math.cos(k * x) * math.sin(k * y)
     dh_dy = A * k * math.sin(k * x) * math.cos(k * y)
     return dh_dx, dh_dy
 
-def tilt_angle(x, y):
-    dh_dx, dh_dy = terrain_gradient(x, y)
-    # Gradient magnitude
+def terrain_height_perlin(x, y):
+    # Perlin noise terrain
+    A = 10  # Amplitude
+    scale = PERLIN_SCALE
+    # Generate noise value between -1 and 1
+    noise_value = noise.pnoise2(x * scale, y * scale)
+    return A * noise_value
+
+def terrain_gradient_perlin(x, y):
+    A = 10
+    scale = PERLIN_SCALE
+    # Compute gradients using finite differences
+    delta = 0.01
+    h_center = noise.pnoise2(x * scale, y * scale)
+    h_x1 = noise.pnoise2((x + delta) * scale, y * scale)
+    h_y1 = noise.pnoise2(x * scale, (y + delta) * scale)
+    dh_dx = A * (h_x1 - h_center) / delta
+    dh_dy = A * (h_y1 - h_center) / delta
+    return dh_dx, dh_dy
+
+def tilt_angle(x, y, terrain_type):
+    if terrain_type == TERRAIN_PERLIN:
+        dh_dx, dh_dy = terrain_gradient_perlin(x, y)
+    else:
+        dh_dx, dh_dy = terrain_gradient_sine(x, y)
     gradient_magnitude = math.sqrt(dh_dx**2 + dh_dy**2)
-    # Tilt angle in radians
     theta = math.atan(gradient_magnitude)
-    # Limit the tilt angle to a maximum of 15 degrees (converted to radians)
     max_tilt_radians = math.radians(15)
     if theta > max_tilt_radians:
         theta = max_tilt_radians
     return theta
 
-def tilt_direction(x, y):
-    dh_dx, dh_dy = terrain_gradient(x, y)
-    # Direction angle in radians (0 = east, pi/2 = north)
+def tilt_direction(x, y, terrain_type):
+    if terrain_type == TERRAIN_PERLIN:
+        dh_dx, dh_dy = terrain_gradient_perlin(x, y)
+    else:
+        dh_dx, dh_dy = terrain_gradient_sine(x, y)
     phi = math.atan2(dh_dy, dh_dx)
     return phi
 
 # Calculate visibility range
-def get_visibility_range(x, y):
-    # Compute tilt angle at the current position
-    theta = tilt_angle(x, y)
+def get_visibility_range(x, y, terrain_type):
+    theta = tilt_angle(x, y, terrain_type)
     sin_theta = math.sin(theta)
-
-    # Compute horizon distances in downhill and uphill directions
     d_downhill_miles = 1.22 * math.sqrt(VIEWER_HEIGHT_FT * (1 + sin_theta))
     d_uphill_miles = 1.22 * math.sqrt(VIEWER_HEIGHT_FT * (1 - sin_theta))
-
-    # Convert distances to squares
     a_squares = int(d_downhill_miles / SQUARE_SIZE_MILES)
     b_squares = int(d_uphill_miles / SQUARE_SIZE_MILES)
-
-    # Return visibility ranges and tilt direction
-    phi = tilt_direction(x, y)
+    phi = tilt_direction(x, y, terrain_type)
     return a_squares, b_squares, phi
 
 # Session management functions (unchanged)
@@ -104,7 +123,7 @@ def generate_lobby_code():
         if not redis_client.exists(lobby_code):
             return lobby_code
 
-# Routes (unchanged except for '/visible_cells')
+# Routes
 @app.route('/')
 def index():
     session_id = get_session_id()
@@ -117,6 +136,7 @@ def start_game():
     session_id = get_session_id()
     data = request.get_json(silent=True) or {}
     player_name = data.get('player_name', 'Player1')
+    terrain_type = data.get('terrain_type', TERRAIN_SINE)
     lobby_code = generate_lobby_code()
     session_data = {'lobby_code': lobby_code, 'player_name': player_name}
 
@@ -126,7 +146,8 @@ def start_game():
         'max_players': 4,
         'player_names': [player_name],
         'ready_statuses': [False],
-        'game_started': False
+        'game_started': False,
+        'terrain_type': terrain_type
     }
     redis_client.set(lobby_code, json.dumps(game_state), ex=3600)
 
@@ -204,13 +225,14 @@ def visible_cells():
         return jsonify({'status': 'error', 'message': 'Game state not found'}), 400
 
     game_state = json.loads(game_state_json)
+    terrain_type = game_state.get('terrain_type', TERRAIN_SINE)
 
     position = game_state['position']
     center_x = position['x']
     center_y = position['y']
 
     # Get the adjusted visibility ranges
-    a_squares, b_squares, phi = get_visibility_range(center_x, center_y)
+    a_squares, b_squares, phi = get_visibility_range(center_x, center_y, terrain_type)
 
     # Rotate the ellipse to align with the tilt direction
     cos_phi = math.cos(phi)
@@ -220,7 +242,7 @@ def visible_cells():
     visible_cells = []
 
     # Determine the grid boundaries
-    max_range = max(a_squares, b_squares, 10)  # Ensure a minimum grid size
+    max_range = max(a_squares, b_squares, 10)
     for y in range(center_y - max_range, center_y + max_range + 1):
         for x in range(center_x - max_range, center_x + max_range + 1):
             dx = x - center_x

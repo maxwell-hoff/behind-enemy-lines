@@ -7,8 +7,8 @@
             height: 100%;
             margin: 0;
             display: flex;
-            justify-content: center; /* Center horizontally */
-            align-items: center;     /* Center vertically */
+            justify-content: center;
+            align-items: center;
         }
         #menu {
             text-align: center;
@@ -33,7 +33,13 @@
     <div id="menu">
         <h1>Flat Surface Horizon Grid</h1>
         <!-- Input for player name when starting a new game -->
-        <input type="text" id="player-name-input" placeholder="Enter Your Name">
+        <input type="text" id="player-name-input" placeholder="Enter Your Name"><br><br>
+        <!-- Terrain type selection -->
+        <label>Select Terrain Type:</label><br>
+        <input type="radio" id="terrain-sine" name="terrain-type" value="sine" checked>
+        <label for="terrain-sine">Sine Wave</label><br>
+        <input type="radio" id="terrain-perlin" name="terrain-type" value="perlin">
+        <label for="terrain-perlin">Perlin Noise</label><br><br>
         <button onclick="startGame()">Start New Game</button>
         <button onclick="showJoinForm()">Join Game</button>
         <div id="join-form">
@@ -46,10 +52,11 @@
     <script>
         function startGame() {
             const playerName = document.getElementById('player-name-input').value.trim() || 'Player1';
+            const terrainType = document.querySelector('input[name="terrain-type"]:checked').value;
             fetch('/start_game', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({'player_name': playerName})
+                body: JSON.stringify({'player_name': playerName, 'terrain_type': terrainType})
             })
             .then(response => response.json())
             .then(data => {
