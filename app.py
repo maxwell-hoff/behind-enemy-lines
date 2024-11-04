@@ -8,7 +8,6 @@ import uuid
 import random
 import string
 import noise  # Import the noise library
-import heapq  # For efficient LOS calculation if needed
 
 app = Flask(__name__)
 
@@ -36,18 +35,18 @@ TERRAIN_MOUNTAINS = 'mountains'
 PERLIN_SCALE = 0.05  # Adjust as needed
 
 # Define parameters for the mountain terrain
-MOUNTAIN_PEAK_HEIGHT = 50  # Height of the mountain peaks
+MOUNTAIN_PEAK_HEIGHT = 500  # Increased height of the mountain peaks
 MOUNTAIN_SCALE = 0.01  # Controls the size of the mountains
 
 def terrain_height_sine(x, y):
     # Sine wave terrain
-    A = 10
+    A = 500  # Increased amplitude
     wavelength = 200
     k = (2 * math.pi) / wavelength
     return A * math.sin(k * x) * math.sin(k * y)
 
 def terrain_gradient_sine(x, y):
-    A = 10
+    A = 500
     wavelength = 200
     k = (2 * math.pi) / wavelength
     dh_dx = A * k * math.cos(k * x) * math.sin(k * y)
@@ -56,7 +55,7 @@ def terrain_gradient_sine(x, y):
 
 def terrain_height_perlin(x, y):
     # Perlin noise terrain
-    A = 10  # Amplitude
+    A = 500  # Increased amplitude
     scale = PERLIN_SCALE
     # Generate noise value between -1 and 1
     noise_value = noise.pnoise2(x * scale, y * scale)
@@ -78,12 +77,11 @@ def terrain_height_mountains(x, y):
     for peak in peaks:
         distance_sq = (x - peak['x'])**2 + (y - peak['y'])**2
         peak_height += peak['height'] * math.exp(-distance_sq / (2 * (50**2)))
-    return base_height * 10 + peak_height
+    return base_height * 500 + peak_height  # Increased base terrain variation
 
 def terrain_gradient_perlin(x, y):
-    A = 10
+    A = 500
     scale = PERLIN_SCALE
-    # Compute gradients using finite differences
     delta = 0.01
     h_center = noise.pnoise2(x * scale, y * scale)
     h_x1 = noise.pnoise2((x + delta) * scale, y * scale)
@@ -118,26 +116,34 @@ def terrain_gradient(x, y, terrain_type):
     else:
         return terrain_gradient_sine(x, y)
 
+def horizon_distance(viewer_elevation_ft):
+    return 1.22 * math.sqrt(viewer_elevation_ft)
+
 def line_of_sight_visibility(center_x, center_y, terrain_type):
-    VIEWER_HEIGHT_FT = 6
-    MAX_VIEW_DISTANCE_SQUARES = 100  # Adjust as needed
     VERTICAL_SCALE = 1  # Adjust vertical exaggeration
 
     visible_cells = []
 
-    # Convert viewer height to terrain units (assuming 1 unit = 1 foot)
+    # Get viewer elevation in feet
     viewer_elevation = terrain_height(center_x, center_y, terrain_type) + VIEWER_HEIGHT_FT
 
+    # Calculate horizon distance in miles
+    max_view_distance_miles = horizon_distance(viewer_elevation)
+    max_view_distance_squares = int(max_view_distance_miles / SQUARE_SIZE_MILES)
+
+    # Ensure we have at least one square to look at
+    if max_view_distance_squares < 1:
+        max_view_distance_squares = 1
+
     # Cast rays in all directions
-    for angle_deg in range(0, 360, 2):  # Adjust angle increment for resolution
+    for angle_deg in range(0, 360, 2):
         angle_rad = math.radians(angle_deg)
         sin_theta = math.sin(angle_rad)
         cos_theta = math.cos(angle_rad)
 
         prev_max_angle = -math.inf
 
-        # Start from d = 0 to include the center cell
-        for d in range(0, MAX_VIEW_DISTANCE_SQUARES + 1):
+        for d in range(0, max_view_distance_squares + 1):
             x = center_x + d * cos_theta
             y = center_y + d * sin_theta
 
@@ -146,8 +152,9 @@ def line_of_sight_visibility(center_x, center_y, terrain_type):
 
             target_elevation = terrain_height(x, y, terrain_type)
             delta_h = (target_elevation - viewer_elevation) * VERTICAL_SCALE
-            distance = max(d * SQUARE_SIZE_MILES * 5280, 1)
-            elevation_angle = math.degrees(math.atan2(delta_h, distance))
+            distance_ft = max(d * SQUARE_SIZE_MILES * 5280, 1)  # Convert miles to feet
+
+            elevation_angle = math.degrees(math.atan2(delta_h, distance_ft))
 
             if elevation_angle > prev_max_angle:
                 # Point is visible
