@@ -8,6 +8,7 @@ import uuid
 import random
 import string
 import noise  # Import the noise library
+import heapq  # For efficient LOS calculation if needed
 
 app = Flask(__name__)
 
@@ -29,9 +30,14 @@ SQUARE_SIZE_MILES = 0.1
 # Terrain types
 TERRAIN_SINE = 'sine'
 TERRAIN_PERLIN = 'perlin'
+TERRAIN_MOUNTAINS = 'mountains' 
 
 # Define the scale for Perlin noise
 PERLIN_SCALE = 0.05  # Adjust as needed
+
+# Define parameters for the mountain terrain
+MOUNTAIN_PEAK_HEIGHT = 50  # Height of the mountain peaks
+MOUNTAIN_SCALE = 0.01  # Controls the size of the mountains
 
 def terrain_height_sine(x, y):
     # Sine wave terrain
@@ -56,6 +62,16 @@ def terrain_height_perlin(x, y):
     noise_value = noise.pnoise2(x * scale, y * scale)
     return A * noise_value
 
+def terrain_height_mountains(x, y):
+    # Mountains terrain using Perlin noise and Gaussian peaks
+    A = MOUNTAIN_PEAK_HEIGHT
+    scale = MOUNTAIN_SCALE
+    # Perlin noise for base terrain
+    base_height = noise.pnoise2(x * scale, y * scale)
+    # Gaussian function to create peaks
+    peak_height = A * math.exp(-((x - 100)**2 + (y - 100)**2) / (2 * (50**2)))
+    return base_height * 10 + peak_height
+
 def terrain_gradient_perlin(x, y):
     A = 10
     scale = PERLIN_SCALE
@@ -67,6 +83,71 @@ def terrain_gradient_perlin(x, y):
     dh_dx = A * (h_x1 - h_center) / delta
     dh_dy = A * (h_y1 - h_center) / delta
     return dh_dx, dh_dy
+
+def terrain_gradient_mountains(x, y):
+    scale = MOUNTAIN_SCALE
+    delta = 0.01
+    h_center = terrain_height_mountains(x, y)
+    h_x1 = terrain_height_mountains(x + delta, y)
+    h_y1 = terrain_height_mountains(x, y + delta)
+    dh_dx = (h_x1 - h_center) / delta
+    dh_dy = (h_y1 - h_center) / delta
+    return dh_dx, dh_dy
+
+def terrain_height(x, y, terrain_type):
+    if terrain_type == TERRAIN_PERLIN:
+        return terrain_height_perlin(x, y)
+    elif terrain_type == TERRAIN_MOUNTAINS:
+        return terrain_height_mountains(x, y)
+    else:
+        return terrain_height_sine(x, y)
+
+def terrain_gradient(x, y, terrain_type):
+    if terrain_type == TERRAIN_PERLIN:
+        return terrain_gradient_perlin(x, y)
+    elif terrain_type == TERRAIN_MOUNTAINS:
+        return terrain_gradient_mountains(x, y)
+    else:
+        return terrain_gradient_sine(x, y)
+
+def line_of_sight_visibility(center_x, center_y, terrain_type):
+    VIEWER_HEIGHT_FT = 6
+    MAX_VIEW_DISTANCE_SQUARES = 100  # Adjust as needed
+    VERTICAL_SCALE = 1  # Adjust vertical exaggeration
+
+    visible_cells = []
+
+    # Convert viewer height to terrain units (assuming 1 unit = 1 foot)
+    viewer_elevation = terrain_height(center_x, center_y, terrain_type) + VIEWER_HEIGHT_FT
+
+    # Cast rays in all directions
+    for angle_deg in range(0, 360, 2):  # Adjust angle increment for resolution
+        angle_rad = math.radians(angle_deg)
+        sin_theta = math.sin(angle_rad)
+        cos_theta = math.cos(angle_rad)
+
+        prev_max_angle = -math.inf
+
+        for d in range(1, MAX_VIEW_DISTANCE_SQUARES + 1):
+            x = center_x + d * cos_theta
+            y = center_y + d * sin_theta
+
+            # Get integer coordinates for grid
+            x_int = int(round(x))
+            y_int = int(round(y))
+
+            # Calculate elevation angle to the point
+            target_elevation = terrain_height(x, y, terrain_type)
+            delta_h = (target_elevation - viewer_elevation) * VERTICAL_SCALE
+            distance = d * SQUARE_SIZE_MILES * 5280  # Convert miles to feet
+            elevation_angle = math.degrees(math.atan2(delta_h, distance))
+
+            if elevation_angle > prev_max_angle:
+                # Point is visible
+                visible_cells.append({'x': x_int - center_x, 'y': y_int - center_y})
+                prev_max_angle = elevation_angle
+
+    return visible_cells
 
 def tilt_angle(x, y, terrain_type):
     if terrain_type == TERRAIN_PERLIN:
@@ -231,30 +312,34 @@ def visible_cells():
     center_x = position['x']
     center_y = position['y']
 
-    # Get the adjusted visibility ranges
-    a_squares, b_squares, phi = get_visibility_range(center_x, center_y, terrain_type)
+    # Use LOS visibility for "mountains" terrain
+    if terrain_type == TERRAIN_MOUNTAINS:
+        visible_cells = line_of_sight_visibility(center_x, center_y, terrain_type)
+    else:
+        # Existing visibility calculation
+        a_squares, b_squares, phi = get_visibility_range(center_x, center_y, terrain_type)
 
-    # Rotate the ellipse to align with the tilt direction
-    cos_phi = math.cos(phi)
-    sin_phi = math.sin(phi)
+        # Rotate the ellipse to align with the tilt direction
+        cos_phi = math.cos(phi)
+        sin_phi = math.sin(phi)
 
-    # Prepare visible cells
-    visible_cells = []
+        # Prepare visible cells
+        visible_cells = []
 
-    # Determine the grid boundaries
-    max_range = max(a_squares, b_squares, 10)
-    for y in range(center_y - max_range, center_y + max_range + 1):
-        for x in range(center_x - max_range, center_x + max_range + 1):
-            dx = x - center_x
-            dy = y - center_y
+        # Determine the grid boundaries
+        max_range = max(a_squares, b_squares, 10)
+        for y in range(center_y - max_range, center_y + max_range + 1):
+            for x in range(center_x - max_range, center_x + max_range + 1):
+                dx = x - center_x
+                dy = y - center_y
 
-            # Rotate coordinates to align with the ellipse axes
-            x_rot = dx * cos_phi + dy * sin_phi
-            y_rot = -dx * sin_phi + dy * cos_phi
+                # Rotate coordinates to align with the ellipse axes
+                x_rot = dx * cos_phi + dy * sin_phi
+                y_rot = -dx * sin_phi + dy * cos_phi
 
-            # Check if the point is within the ellipse
-            if (x_rot / a_squares) ** 2 + (y_rot / b_squares) ** 2 <= 1:
-                visible_cells.append({'x': dx, 'y': dy})
+                # Check if the point is within the ellipse
+                if (x_rot / a_squares) ** 2 + (y_rot / b_squares) ** 2 <= 1:
+                    visible_cells.append({'x': dx, 'y': dy})
 
     # Prepare previous positions relative to the current position
     relative_previous_positions = []

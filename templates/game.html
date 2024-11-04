@@ -18,10 +18,13 @@
             display: grid;
             grid-gap: 1px;
             /* grid-template-columns and rows will be set dynamically */
+            max-width: 800px; /* Adjust as needed */
+            max-height: 800px; /* Adjust as needed */
+            overflow: auto;
         }
         .cell {
-            width: 5px;
-            height: 5px;
+            width: 3px;  /* Reduce cell size */
+            height: 3px;
             background-color: grey;
         }
         .center {
