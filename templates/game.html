@@ -34,6 +34,7 @@
             left: 50%;
             transform: translateX(-50%);
             z-index: 1;
+            text-align: center;
         }
         #controls button {
             margin: 2px;
@@ -76,6 +77,19 @@
                 <option value="topographic">Topographic</option>
             </select>
         </div>
+        <!-- Dropdown menu for movement scale -->
+        <div style="margin-top: 10px;">
+            <label for="movement-scale">Movement Scale:</label>
+            <select id="movement-scale">
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="5">5</option>
+                <option value="10">10</option>
+                <option value="25">25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+            </select>
+        </div>
     </div>
     <div id="grid-container">
         <div id="grid"></div>
@@ -84,10 +98,10 @@
         const cellWidth = 3;
         const cellHeight = 3;
         const gridGap = 1;
-        const controlsHeight = 100;
+        const controlsHeight = 150; // Adjusted height to accommodate new controls
 
         // Define fixed grid size
-        const gridSize = 401; // Must be an odd number to have a center cell
+        const gridSize = 401; // Adjust as needed for performance
         const centerIndex = Math.floor(gridSize / 2); // Center index of the grid
 
         function updateGrid() {
@@ -193,10 +207,11 @@
         }
 
         function move(direction) {
+            const movementScale = parseInt(document.getElementById('movement-scale').value) || 1;
             fetch('/move', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({'direction': direction})
+                body: JSON.stringify({'direction': direction, 'scale': movementScale})
             })
             .then(response => response.json())
             .then(data => {

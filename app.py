@@ -110,7 +110,7 @@ def horizon_distance(viewer_elevation_ft):
     viewer_elevation_ft = max(viewer_elevation_ft, VIEWER_HEIGHT_FT)
     # Calculate the standard horizon distance
     calculated_distance = 1.22 * math.sqrt(viewer_elevation_ft)
-    # Limit the horizon distance to a maximum of 10 miles
+    # Limit the horizon distance to a maximum of 15 miles
     max_horizon_distance = 15  # in miles
     return min(calculated_distance, max_horizon_distance)
 
@@ -373,6 +373,7 @@ def visible_cells():
     response.set_cookie('session_id', session_id)
     return response
 
+# Modify the /move route
 @app.route('/move', methods=['POST'])
 def move():
     session_id = get_session_id()
@@ -382,9 +383,16 @@ def move():
 
     lobby_code = session_data['lobby_code']
 
-    direction = request.json.get('direction')
+    data = request.get_json()
+    direction = data.get('direction')
     if not direction:
         return jsonify({'status': 'error', 'message': 'No direction provided'}), 400
+
+    scale = data.get('scale', 1)
+    try:
+        scale = int(scale)
+    except (ValueError, TypeError):
+        scale = 1
 
     game_state_json = redis_client.get(lobby_code)
     if not game_state_json:
@@ -393,25 +401,38 @@ def move():
     game_state = json.loads(game_state_json)
 
     position = game_state['position']
+    previous_positions = game_state.setdefault('previous_positions', [])
 
-    # Update previous positions
-    game_state.setdefault('previous_positions', []).append({'x': position['x'], 'y': position['y']})
-
-    # Update position based on direction
+    # Determine the movement direction
+    dx, dy = 0, 0
     if direction == 'up':
-        position['y'] -= 1
+        dx, dy = 0, -1
     elif direction == 'down':
-        position['y'] += 1
+        dx, dy = 0, 1
     elif direction == 'left':
-        position['x'] -= 1
+        dx, dy = -1, 0
     elif direction == 'right':
-        position['x'] += 1
+        dx, dy = 1, 0
     else:
         return jsonify({'status': 'error', 'message': 'Invalid direction'}), 400
 
-    # Limit the length of previous positions to avoid too much data
-    if len(game_state['previous_positions']) > 100:
-        game_state['previous_positions'] = game_state['previous_positions'][-100:]
+    # Record the starting position
+    x0, y0 = position['x'], position['y']
+
+    # Generate the positions along the path (excluding the starting position)
+    path_positions = [{'x': x0 + dx * step, 'y': y0 + dy * step} for step in range(1, scale + 1)]
+
+    # Append the path positions to previous_positions
+    previous_positions.extend(path_positions)
+
+    # Update the current position to the final position
+    position['x'] = x0 + dx * scale
+    position['y'] = y0 + dy * scale
+
+    # Limit the length of previous_positions to avoid too much data
+    if len(previous_positions) > 100:
+        previous_positions = previous_positions[-100:]
+        game_state['previous_positions'] = previous_positions
 
     # Update game state in Redis
     redis_client.set(lobby_code, json.dumps(game_state), ex=3600)
