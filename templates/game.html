@@ -99,6 +99,7 @@
         const cellHeight = 3;
         const gridGap = 1;
         const controlsHeight = 150; // Adjusted height to accommodate new controls
+        const MAX_VEG_HEIGHT = 50; // Must match the value in app.py
 
         // Define fixed grid size
         const gridSize = 401; // Adjust as needed for performance
@@ -165,7 +166,8 @@
                             } else {
                                 if (displayMode === 'topographic') {
                                     const elevation = cellData.elevation;
-                                    const color = getColorForElevation(elevation, minElevation, maxElevation);
+                                    const vegetationHeight = cellData.vegetation_height || 0;
+                                    const color = getColorForElevation(elevation, minElevation, maxElevation, vegetationHeight);
                                     cell.style.backgroundColor = color;
                                 } else {
                                     cell.style.backgroundColor = 'grey';
@@ -200,10 +202,15 @@
             });
         }
 
-        function getColorForElevation(elevation, minElevation, maxElevation) {
+        function getColorForElevation(elevation, minElevation, maxElevation, vegetationHeight) {
             const ratio = (elevation - minElevation) / (maxElevation - minElevation);
             const hue = (1 - ratio) * 240;
-            return `hsl(${hue}, 100%, 50%)`;
+
+            // Adjust lightness based on vegetation
+            const vegetationRatio = vegetationHeight / MAX_VEG_HEIGHT;
+            const lightness = 50 - vegetationRatio * 20; // Darker with more vegetation
+
+            return `hsl(${hue}, 100%, ${lightness}%)`;
         }
 
         function move(direction) {

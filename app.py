@@ -37,6 +37,7 @@ PERLIN_SCALE = 0.05  # Adjust as needed
 # Define parameters for the mountain terrain
 MOUNTAIN_PEAK_HEIGHT = 500  # Increased height of the mountain peaks
 MOUNTAIN_SCALE = 0.01  # Controls the size of the mountains
+MAX_VEG_HEIGHT = 50  # Maximum vegetation height in feet
 
 def terrain_height_sine(x, y):
     A = 500
@@ -119,8 +120,10 @@ def line_of_sight_visibility(center_x, center_y, terrain_type):
 
     visible_cells = []
 
-    # Get viewer elevation in feet
-    viewer_elevation = terrain_height(center_x, center_y, terrain_type) + VIEWER_HEIGHT_FT
+    # Get viewer elevation in feet (include vegetation at viewer's location)
+    viewer_terrain_elevation = terrain_height(center_x, center_y, terrain_type)
+    viewer_veg_height = vegetation_height(center_x, center_y, viewer_terrain_elevation)
+    viewer_elevation = viewer_terrain_elevation + viewer_veg_height + VIEWER_HEIGHT_FT
 
     # Calculate horizon distance in miles
     max_view_distance_miles = horizon_distance(viewer_elevation)
@@ -145,23 +148,51 @@ def line_of_sight_visibility(center_x, center_y, terrain_type):
             x_int = int(round(x))
             y_int = int(round(y))
 
-            target_elevation = terrain_height(x, y, terrain_type)
-            delta_h = (target_elevation - viewer_elevation) * VERTICAL_SCALE
+            target_terrain_elevation = terrain_height(x, y, terrain_type)
+            target_veg_height = vegetation_height(x, y, target_terrain_elevation)
+            target_total_elevation = target_terrain_elevation + target_veg_height
+
+            delta_h = (target_total_elevation - viewer_elevation) * VERTICAL_SCALE
             distance_ft = max(d * SQUARE_SIZE_MILES * 5280, 1)  # Convert miles to feet
 
             elevation_angle = math.degrees(math.atan2(delta_h, distance_ft))
 
             if elevation_angle > prev_max_angle:
                 # Point is visible
-                cell_elevation = target_elevation
+                cell_elevation = target_terrain_elevation
+                cell_vegetation_height = target_veg_height
                 visible_cells.append({
                     'x': x_int - center_x,
                     'y': y_int - center_y,
-                    'elevation': cell_elevation
+                    'elevation': cell_elevation,
+                    'vegetation_height': cell_vegetation_height
                 })
                 prev_max_angle = elevation_angle
+            else:
+                # Line of sight blocked; break out of loop
+                break
 
     return visible_cells
+
+def vegetation_height(x, y, elevation):
+    # Parameters for vegetation generation
+    VEG_SCALE = 0.1  # Controls the size of vegetation patches
+    MAX_VEG_HEIGHT = 50  # Maximum vegetation height in feet
+    
+    # Generate base vegetation density using Perlin noise
+    base_density = noise.pnoise2(x * VEG_SCALE, y * VEG_SCALE, repeatx=1000, repeaty=1000)
+    # Normalize base_density to range [0, 1]
+    base_density = (base_density + 0.5)  # Perlin noise outputs range from -0.5 to 0.5
+    
+    # Adjust vegetation density based on elevation
+    # Assuming elevation ranges from 500 ft to higher values
+    # Higher elevations have less vegetation
+    elevation_factor = max(0, 1 - (elevation - 500) / 1500)  # Adjust denominator as per elevation range
+    vegetation_density = base_density * elevation_factor
+    
+    # Calculate vegetation height
+    veg_height = vegetation_density * MAX_VEG_HEIGHT
+    return veg_height
 
 def tilt_angle(x, y, terrain_type):
     if terrain_type == TERRAIN_PERLIN:
