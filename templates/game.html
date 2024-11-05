@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Flat Surface Horizon Grid - Game</title>
+    <title>Behind Enemy Lines - Game</title>
     <style>
         body, html {
             height: 100%;
@@ -105,6 +105,10 @@
         const gridSize = 401; // Adjust as needed for performance
         const centerIndex = Math.floor(gridSize / 2); // Center index of the grid
 
+        // Global elevation constants
+        const GLOBAL_MIN_ELEVATION = 0;    // Adjust based on your terrain
+        const GLOBAL_MAX_ELEVATION = 2000; // Adjust based on your terrain's maximum elevation
+
         function updateGrid() {
             fetch('/visible_cells')
             .then(response => response.json())
@@ -125,14 +129,6 @@
                 grid.style.gridTemplateRows = `repeat(${gridSize}, ${cellHeight}px)`;
 
                 document.getElementById('lobby-code').textContent = data.lobby_code;
-
-                // Find min and max elevations
-                let minElevation = Infinity;
-                let maxElevation = -Infinity;
-                visibleCells.forEach(cell => {
-                    if (cell.elevation < minElevation) minElevation = cell.elevation;
-                    if (cell.elevation > maxElevation) maxElevation = cell.elevation;
-                });
 
                 // Create a Map of visible cell positions and elevations
                 const visibleCellsMap = new Map();
@@ -156,6 +152,8 @@
                         const cellKey = `${x},${y}`;
                         if (visibleCellsMap.has(cellKey)) {
                             const cellData = visibleCellsMap.get(cellKey);
+                            const elevation = cellData.elevation;
+                            const vegetationHeight = cellData.vegetation_height || 0;
 
                             if (x === 0 && y === 0) {
                                 cell.classList.add('center');
@@ -165,12 +163,27 @@
                                 cell.style.backgroundColor = 'lightgrey';
                             } else {
                                 if (displayMode === 'topographic') {
-                                    const elevation = cellData.elevation;
-                                    const vegetationHeight = cellData.vegetation_height || 0;
-                                    const color = getColorForElevation(elevation, minElevation, maxElevation, vegetationHeight);
-                                    cell.style.backgroundColor = color;
+                                    // Determine base terrain color
+                                    const terrainColor = getColorForElevation(elevation);
+
+                                    // Determine vegetation color
+                                    if (vegetationHeight > 0) {
+                                        const vegRatio = vegetationHeight / MAX_VEG_HEIGHT;
+                                        const greenIntensity = Math.floor(vegRatio * 200) + 55; // Ensures the color isn't too dark
+                                        cell.style.backgroundColor = `rgb(0, ${greenIntensity}, 0)`;
+                                    } else {
+                                        // No vegetation, use terrain color
+                                        cell.style.backgroundColor = terrainColor;
+                                    }
                                 } else {
-                                    cell.style.backgroundColor = 'grey';
+                                    // Standard mode
+                                    if (vegetationHeight > 0) {
+                                        const vegRatio = vegetationHeight / MAX_VEG_HEIGHT;
+                                        const greenIntensity = Math.floor(vegRatio * 200) + 55;
+                                        cell.style.backgroundColor = `rgb(0, ${greenIntensity}, 0)`;
+                                    } else {
+                                        cell.style.backgroundColor = 'grey';
+                                    }
                                 }
                             }
                         } else {
@@ -202,15 +215,10 @@
             });
         }
 
-        function getColorForElevation(elevation, minElevation, maxElevation, vegetationHeight) {
-            const ratio = (elevation - minElevation) / (maxElevation - minElevation);
+        function getColorForElevation(elevation) {
+            const ratio = (elevation - GLOBAL_MIN_ELEVATION) / (GLOBAL_MAX_ELEVATION - GLOBAL_MIN_ELEVATION);
             const hue = (1 - ratio) * 240;
-
-            // Adjust lightness based on vegetation
-            const vegetationRatio = vegetationHeight / MAX_VEG_HEIGHT;
-            const lightness = 50 - vegetationRatio * 20; // Darker with more vegetation
-
-            return `hsl(${hue}, 100%, ${lightness}%)`;
+            return `hsl(${hue}, 100%, 50%)`;
         }
 
         function move(direction) {

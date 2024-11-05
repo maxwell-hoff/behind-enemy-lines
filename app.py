@@ -37,7 +37,14 @@ PERLIN_SCALE = 0.05  # Adjust as needed
 # Define parameters for the mountain terrain
 MOUNTAIN_PEAK_HEIGHT = 500  # Increased height of the mountain peaks
 MOUNTAIN_SCALE = 0.01  # Controls the size of the mountains
+# Vegetation parameters
 MAX_VEG_HEIGHT = 50  # Maximum vegetation height in feet
+VEG_SCALE = 0.05  # Controls the size of vegetation patches
+MIN_VEG_DENSITY = 0.0  # Minimum vegetation density (0 to 1)
+MAX_VEG_DENSITY = 0.6  # Maximum vegetation density (0 to 1)
+VEG_DISTRIBUTION_COEF = 1.5  # Coefficient to control distribution skewness
+ELEVATION_VEG_COEF = 2000  # Elevation coefficient to adjust vegetation with elevation
+
 
 def terrain_height_sine(x, y):
     A = 500
@@ -175,21 +182,18 @@ def line_of_sight_visibility(center_x, center_y, terrain_type):
     return visible_cells
 
 def vegetation_height(x, y, elevation):
-    # Parameters for vegetation generation
-    VEG_SCALE = 0.1  # Controls the size of vegetation patches
-    MAX_VEG_HEIGHT = 50  # Maximum vegetation height in feet
-    
     # Generate base vegetation density using Perlin noise
     base_density = noise.pnoise2(x * VEG_SCALE, y * VEG_SCALE, repeatx=1000, repeaty=1000)
     # Normalize base_density to range [0, 1]
-    base_density = (base_density + 0.5)  # Perlin noise outputs range from -0.5 to 0.5
-    
+    base_density = (base_density + 0.5) ** VEG_DISTRIBUTION_COEF  # Apply distribution coefficient
+
     # Adjust vegetation density based on elevation
-    # Assuming elevation ranges from 500 ft to higher values
-    # Higher elevations have less vegetation
-    elevation_factor = max(0, 1 - (elevation - 500) / 1500)  # Adjust denominator as per elevation range
+    elevation_factor = max(0, 1 - (elevation - 500) / ELEVATION_VEG_COEF)
     vegetation_density = base_density * elevation_factor
-    
+
+    # Clamp vegetation density to min and max values
+    vegetation_density = max(MIN_VEG_DENSITY, min(vegetation_density, MAX_VEG_DENSITY))
+
     # Calculate vegetation height
     veg_height = vegetation_density * MAX_VEG_HEIGHT
     return veg_height
