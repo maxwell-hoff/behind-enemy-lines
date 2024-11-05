@@ -111,7 +111,7 @@ def horizon_distance(viewer_elevation_ft):
     # Calculate the standard horizon distance
     calculated_distance = 1.22 * math.sqrt(viewer_elevation_ft)
     # Limit the horizon distance to a maximum of 15 miles
-    max_horizon_distance = 15  # in miles
+    max_horizon_distance = 20  # in miles
     return min(calculated_distance, max_horizon_distance)
 
 def line_of_sight_visibility(center_x, center_y, terrain_type):
