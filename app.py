@@ -110,7 +110,7 @@ def horizon_distance(viewer_elevation_ft):
     viewer_elevation_ft = max(viewer_elevation_ft, VIEWER_HEIGHT_FT)
     # Calculate the standard horizon distance
     calculated_distance = 1.22 * math.sqrt(viewer_elevation_ft)
-    # Limit the horizon distance to a maximum of 10 miles
+    # Limit the horizon distance to a maximum of 15 miles
     max_horizon_distance = 15  # in miles
     return min(calculated_distance, max_horizon_distance)
 
@@ -382,9 +382,16 @@ def move():
 
     lobby_code = session_data['lobby_code']
 
-    direction = request.json.get('direction')
+    data = request.get_json()
+    direction = data.get('direction')
     if not direction:
         return jsonify({'status': 'error', 'message': 'No direction provided'}), 400
+
+    scale = data.get('scale', 1)
+    try:
+        scale = int(scale)
+    except (ValueError, TypeError):
+        scale = 1
 
     game_state_json = redis_client.get(lobby_code)
     if not game_state_json:
@@ -397,15 +404,15 @@ def move():
     # Update previous positions
     game_state.setdefault('previous_positions', []).append({'x': position['x'], 'y': position['y']})
 
-    # Update position based on direction
+    # Update position based on direction and scale
     if direction == 'up':
-        position['y'] -= 1
+        position['y'] -= scale
     elif direction == 'down':
-        position['y'] += 1
+        position['y'] += scale
     elif direction == 'left':
-        position['x'] -= 1
+        position['x'] -= scale
     elif direction == 'right':
-        position['x'] += 1
+        position['x'] += scale
     else:
         return jsonify({'status': 'error', 'message': 'Invalid direction'}), 400
 
