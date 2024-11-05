@@ -15,12 +15,12 @@
         }
         #grid {
             display: grid;
-            grid-gap: 1px;
+            grid-gap: 5px;
             transform-origin: center;
         }
         .cell {
-            width: 3px;
-            height: 3px;
+            width: 10px;
+            height: 10px;
         }
         .center {
             background-color: orange;
@@ -96,9 +96,9 @@
         <div id="grid"></div>
     </div>
     <script>
-        const cellWidth = 10;
-        const cellHeight = 10;
-        const gridGap = 5;
+        const cellWidth = 3;
+        const cellHeight = 3;
+        const gridGap = 1;
         const controlsHeight = 150; // Adjusted height to accommodate new controls
         const MAX_VEG_HEIGHT = 50; // Must match the value in app.py
 
