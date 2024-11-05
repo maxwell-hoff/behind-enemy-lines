@@ -110,8 +110,30 @@ def terrain_gradient(x, y, terrain_type):
         return terrain_gradient_perlin(x, y)
     elif terrain_type == TERRAIN_MOUNTAINS:
         return terrain_gradient_mountains(x, y)
-    else:
+    elif terrain_type == TERRAIN_SINE:
         return terrain_gradient_sine(x, y)
+    else:
+        # Default to sine gradient if unknown terrain type
+        return terrain_gradient_sine(x, y)
+
+def terrain_gradient_sine(x, y):
+    A = 500
+    wavelength = 200
+    k = (2 * math.pi) / wavelength
+    delta = 0.01  # Small increment for numerical derivative
+
+    # Calculate central height
+    h_center = A * math.sin(k * x) * math.sin(k * y)
+
+    # Calculate heights at slightly offset positions
+    h_x1 = A * math.sin(k * (x + delta)) * math.sin(k * y)
+    h_y1 = A * math.sin(k * x) * math.sin(k * (y + delta))
+
+    # Compute numerical derivatives
+    dh_dx = (h_x1 - h_center) / delta
+    dh_dy = (h_y1 - h_center) / delta
+
+    return dh_dx, dh_dy
 
 def horizon_distance(viewer_elevation_ft):
     # Set minimum viewer elevation to VIEWER_HEIGHT_FT (6 ft)
