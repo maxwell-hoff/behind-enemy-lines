@@ -37,6 +37,12 @@ PERLIN_SCALE = 0.05  # Adjust as needed
 # Define parameters for the mountain terrain
 MOUNTAIN_PEAK_HEIGHT = 500  # Increased height of the mountain peaks
 MOUNTAIN_SCALE = 0.01  # Controls the size of the mountains
+
+# River parameters
+RIVER_WIDTH = 5  # Width of the river in cells
+RIVER_CENTER_X = 0  # X-coordinate for the center of the river path
+RIVER_FLOW_DIRECTION = 'south'  # Direction the river flows ('south' for this example)
+
 # Vegetation parameters
 MAX_VEG_HEIGHT = 50  # Maximum vegetation height in feet
 VEG_SCALE = 0.05  # Controls the size of vegetation patches
@@ -44,6 +50,21 @@ MIN_VEG_DENSITY = 0.0  # Minimum vegetation density (0 to 1)
 MAX_VEG_DENSITY = 0.1  # Maximum vegetation density (0 to 1)
 VEG_DISTRIBUTION_COEF = 1.5  # Coefficient to control distribution skewness
 ELEVATION_VEG_COEF = 2000  # Elevation coefficient to adjust vegetation with elevation
+
+
+def is_river(x, y):
+    """
+    Determines if the cell at (x, y) is part of the river.
+    For simplicity, the river flows south along the x=0 axis with a sinusoidal meander.
+    """
+    meander_amplitude = 20  # Controls how much the river meanders
+    meander_frequency = 0.05  # Controls the frequency of meanders
+
+    # Calculate the river's central y-coordinate based on x
+    central_y = int(meander_amplitude * math.sin(meander_frequency * x))
+
+    # Check if the cell is within the river's width around the central path
+    return abs(y - central_y) < (RIVER_WIDTH // 2)
 
 
 def terrain_height_sine(x, y):
@@ -139,7 +160,7 @@ def horizon_distance(viewer_elevation_ft):
     viewer_elevation_ft = max(viewer_elevation_ft, VIEWER_HEIGHT_FT)
     # Calculate the standard horizon distance
     calculated_distance = 1.22 * math.sqrt(viewer_elevation_ft)
-    # Limit the horizon distance to a maximum of 15 miles
+    # Limit the horizon distance to a maximum of 20 miles
     max_horizon_distance = 20  # in miles
     return min(calculated_distance, max_horizon_distance)
 
@@ -180,6 +201,9 @@ def line_of_sight_visibility(center_x, center_y, terrain_type):
             target_veg_height = vegetation_height(x, y, target_terrain_elevation)
             target_total_elevation = target_terrain_elevation + target_veg_height
 
+            # Determine if the cell is part of the river
+            target_water = is_river(x_int, y_int) if terrain_type == TERRAIN_MOUNTAINS else False
+
             delta_h = (target_total_elevation - viewer_elevation) * VERTICAL_SCALE
             distance_ft = max(d * SQUARE_SIZE_MILES * 5280, 1)  # Convert miles to feet
 
@@ -193,7 +217,8 @@ def line_of_sight_visibility(center_x, center_y, terrain_type):
                     'x': x_int - center_x,
                     'y': y_int - center_y,
                     'elevation': cell_elevation,
-                    'vegetation_height': cell_vegetation_height
+                    'vegetation_height': cell_vegetation_height,
+                    'water': target_water  # Add water flag
                 })
                 prev_max_angle = elevation_angle
             else:
@@ -293,8 +318,13 @@ def start_game():
     lobby_code = generate_lobby_code()
     session_data = {'lobby_code': lobby_code, 'player_name': player_name}
 
+    # Ensure starting position is on land (not on the river)
+    start_x, start_y = 0, 0  # Starting at the center
+    while is_river(start_x, start_y):
+        start_y += 10  # Move south until landing on land
+
     game_state = {
-        'position': {'x': 0, 'y': 0},
+        'position': {'x': start_x, 'y': start_y},
         'previous_positions': [],
         'max_players': 4,
         'player_names': [player_name],
@@ -400,7 +430,6 @@ def visible_cells():
 
         # Determine the grid boundaries
         max_range = max(a_squares, b_squares, 10)
-        # Inside the else clause of the /visible_cells route
         for y in range(center_y - max_range, center_y + max_range + 1):
             for x in range(center_x - max_range, center_x + max_range + 1):
                 dx = x - center_x
@@ -411,15 +440,16 @@ def visible_cells():
 
                 if (x_rot / a_squares) ** 2 + (y_rot / b_squares) ** 2 <= 1:
                     cell_elevation = terrain_height(x, y, terrain_type)
-                    cell_vegetation_height = vegetation_height(x, y, cell_elevation)  # Add this line
+                    cell_vegetation_height = vegetation_height(x, y, cell_elevation)
+                    cell_water = is_river(x, y) if terrain_type == TERRAIN_MOUNTAINS else False
 
                     visible_cells.append({
                         'x': dx,
                         'y': dy,
                         'elevation': cell_elevation,
-                        'vegetation_height': cell_vegetation_height  # Add this line
+                        'vegetation_height': cell_vegetation_height,
+                        'water': cell_water  # Add water flag
                     })
-
 
     # Prepare previous positions relative to the current position
     relative_previous_positions = []

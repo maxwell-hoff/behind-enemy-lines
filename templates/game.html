@@ -15,12 +15,12 @@
         }
         #grid {
             display: grid;
-            grid-gap: 6px;
+            grid-gap: 3px;
             transform-origin: center;
         }
         .cell {
-            width: 6px;
-            height: 6px;
+            width: 3px;
+            height: 3px;
         }
         .center {
             background-color: orange;
@@ -155,6 +155,7 @@
                             const cellData = visibleCellsMap.get(cellKey);
                             const elevation = cellData.elevation;
                             const vegetationHeight = cellData.vegetation_height || 0;
+                            const isWater = cellData.water || false;
 
                             if (x === 0 && y === 0) {
                                 cell.classList.add('center');
@@ -168,8 +169,10 @@
                                     const terrainColor = getColorForElevation(elevation);
                                     cell.style.backgroundColor = terrainColor;
                                 } else if (displayMode === 'vegetation') {
-                                    // Use vegetation color
-                                    if (vegetationHeight > 0) {
+                                    // Use vegetation color or water
+                                    if (isWater) {
+                                        cell.style.backgroundColor = 'blue';  // Render water as blue
+                                    } else if (vegetationHeight > 0) {
                                         const vegRatio = vegetationHeight / MAX_VEG_HEIGHT;
                                         const greenIntensity = Math.floor(vegRatio * 200) + 55; // Ensures the color isn't too dark
                                         cell.style.backgroundColor = `rgb(0, ${greenIntensity}, 0)`;
