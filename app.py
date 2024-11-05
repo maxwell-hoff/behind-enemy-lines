@@ -373,6 +373,7 @@ def visible_cells():
     response.set_cookie('session_id', session_id)
     return response
 
+# Modify the /move route
 @app.route('/move', methods=['POST'])
 def move():
     session_id = get_session_id()
@@ -400,25 +401,38 @@ def move():
     game_state = json.loads(game_state_json)
 
     position = game_state['position']
+    previous_positions = game_state.setdefault('previous_positions', [])
 
-    # Update previous positions
-    game_state.setdefault('previous_positions', []).append({'x': position['x'], 'y': position['y']})
-
-    # Update position based on direction and scale
+    # Determine the movement direction
+    dx, dy = 0, 0
     if direction == 'up':
-        position['y'] -= scale
+        dx, dy = 0, -1
     elif direction == 'down':
-        position['y'] += scale
+        dx, dy = 0, 1
     elif direction == 'left':
-        position['x'] -= scale
+        dx, dy = -1, 0
     elif direction == 'right':
-        position['x'] += scale
+        dx, dy = 1, 0
     else:
         return jsonify({'status': 'error', 'message': 'Invalid direction'}), 400
 
-    # Limit the length of previous positions to avoid too much data
-    if len(game_state['previous_positions']) > 100:
-        game_state['previous_positions'] = game_state['previous_positions'][-100:]
+    # Record the starting position
+    x0, y0 = position['x'], position['y']
+
+    # Generate the positions along the path (excluding the starting position)
+    path_positions = [{'x': x0 + dx * step, 'y': y0 + dy * step} for step in range(1, scale + 1)]
+
+    # Append the path positions to previous_positions
+    previous_positions.extend(path_positions)
+
+    # Update the current position to the final position
+    position['x'] = x0 + dx * scale
+    position['y'] = y0 + dy * scale
+
+    # Limit the length of previous_positions to avoid too much data
+    if len(previous_positions) > 100:
+        previous_positions = previous_positions[-100:]
+        game_state['previous_positions'] = previous_positions
 
     # Update game state in Redis
     redis_client.set(lobby_code, json.dumps(game_state), ex=3600)
