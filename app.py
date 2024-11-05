@@ -41,7 +41,7 @@ MOUNTAIN_SCALE = 0.01  # Controls the size of the mountains
 MAX_VEG_HEIGHT = 50  # Maximum vegetation height in feet
 VEG_SCALE = 0.05  # Controls the size of vegetation patches
 MIN_VEG_DENSITY = 0.0  # Minimum vegetation density (0 to 1)
-MAX_VEG_DENSITY = 0.3  # Maximum vegetation density (0 to 1)
+MAX_VEG_DENSITY = 0.1  # Maximum vegetation density (0 to 1)
 VEG_DISTRIBUTION_COEF = 1.5  # Coefficient to control distribution skewness
 ELEVATION_VEG_COEF = 2000  # Elevation coefficient to adjust vegetation with elevation
 
