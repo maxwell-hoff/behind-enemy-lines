@@ -205,16 +205,24 @@ def line_of_sight_visibility(center_x, center_y, terrain_type):
 def vegetation_height(x, y, elevation):
     # Generate base vegetation density using Perlin noise
     base_density = noise.pnoise2(x * VEG_SCALE, y * VEG_SCALE, repeatx=1000, repeaty=1000)
-    # Normalize base_density to range [0, 1]
-    base_density = (base_density + 0.5) ** VEG_DISTRIBUTION_COEF  # Apply distribution coefficient
-
+    
+    # Shift range from [-0.5, 0.5] to [0, 1]
+    base_density += 0.5
+    
+    # Clamp base_density to [0, 1] to avoid negative or zero values
+    base_density = max(0.0, min(base_density, 1.0))
+    
+    # Apply distribution coefficient
+    base_density = base_density ** VEG_DISTRIBUTION_COEF  # Raises to power, safe now
+    
     # Adjust vegetation density based on elevation
-    elevation_factor = max(0, 1 - (elevation - 500) / ELEVATION_VEG_COEF)
+    elevation_factor = max(0.0, min(1.0, 1 - (elevation - 500) / ELEVATION_VEG_COEF))
+    
     vegetation_density = base_density * elevation_factor
-
+    
     # Clamp vegetation density to min and max values
     vegetation_density = max(MIN_VEG_DENSITY, min(vegetation_density, MAX_VEG_DENSITY))
-
+    
     # Calculate vegetation height
     veg_height = vegetation_density * MAX_VEG_HEIGHT
     return veg_height
