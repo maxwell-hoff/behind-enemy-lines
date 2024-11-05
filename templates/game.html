@@ -75,6 +75,7 @@
             <select id="display-mode" onchange="updateGrid()">
                 <option value="standard">Standard</option>
                 <option value="topographic">Topographic</option>
+                <option value="vegetation">Vegetation</option> <!-- Add this line -->
             </select>
         </div>
         <!-- Dropdown menu for movement scale -->
@@ -163,27 +164,21 @@
                                 cell.style.backgroundColor = 'lightgrey';
                             } else {
                                 if (displayMode === 'topographic') {
-                                    // Determine base terrain color
+                                    // Use elevation color
                                     const terrainColor = getColorForElevation(elevation);
-
-                                    // Determine vegetation color
+                                    cell.style.backgroundColor = terrainColor;
+                                } else if (displayMode === 'vegetation') {
+                                    // Use vegetation color
                                     if (vegetationHeight > 0) {
                                         const vegRatio = vegetationHeight / MAX_VEG_HEIGHT;
                                         const greenIntensity = Math.floor(vegRatio * 200) + 55; // Ensures the color isn't too dark
                                         cell.style.backgroundColor = `rgb(0, ${greenIntensity}, 0)`;
                                     } else {
-                                        // No vegetation, use terrain color
-                                        cell.style.backgroundColor = terrainColor;
+                                        cell.style.backgroundColor = 'grey'; // No vegetation
                                     }
                                 } else {
                                     // Standard mode
-                                    if (vegetationHeight > 0) {
-                                        const vegRatio = vegetationHeight / MAX_VEG_HEIGHT;
-                                        const greenIntensity = Math.floor(vegRatio * 200) + 55;
-                                        cell.style.backgroundColor = `rgb(0, ${greenIntensity}, 0)`;
-                                    } else {
-                                        cell.style.backgroundColor = 'grey';
-                                    }
+                                    cell.style.backgroundColor = 'grey';
                                 }
                             }
                         } else {

@@ -88,7 +88,6 @@ def terrain_gradient_perlin(x, y):
     return dh_dx, dh_dy
 
 def terrain_gradient_mountains(x, y):
-    scale = MOUNTAIN_SCALE
     delta = 0.01
     h_center = terrain_height_mountains(x, y)
     h_x1 = terrain_height_mountains(x + delta, y)
@@ -221,10 +220,7 @@ def vegetation_height(x, y, elevation):
     return veg_height
 
 def tilt_angle(x, y, terrain_type):
-    if terrain_type == TERRAIN_PERLIN:
-        dh_dx, dh_dy = terrain_gradient_perlin(x, y)
-    else:
-        dh_dx, dh_dy = terrain_gradient_sine(x, y)
+    dh_dx, dh_dy = terrain_gradient(x, y, terrain_type)
     gradient_magnitude = math.sqrt(dh_dx**2 + dh_dy**2)
     theta = math.atan(gradient_magnitude)
     max_tilt_radians = math.radians(15)
@@ -233,10 +229,7 @@ def tilt_angle(x, y, terrain_type):
     return theta
 
 def tilt_direction(x, y, terrain_type):
-    if terrain_type == TERRAIN_PERLIN:
-        dh_dx, dh_dy = terrain_gradient_perlin(x, y)
-    else:
-        dh_dx, dh_dy = terrain_gradient_sine(x, y)
+    dh_dx, dh_dy = terrain_gradient(x, y, terrain_type)
     phi = math.atan2(dh_dy, dh_dx)
     return phi
 
@@ -399,6 +392,7 @@ def visible_cells():
 
         # Determine the grid boundaries
         max_range = max(a_squares, b_squares, 10)
+        # Inside the else clause of the /visible_cells route
         for y in range(center_y - max_range, center_y + max_range + 1):
             for x in range(center_x - max_range, center_x + max_range + 1):
                 dx = x - center_x
@@ -409,11 +403,15 @@ def visible_cells():
 
                 if (x_rot / a_squares) ** 2 + (y_rot / b_squares) ** 2 <= 1:
                     cell_elevation = terrain_height(x, y, terrain_type)
+                    cell_vegetation_height = vegetation_height(x, y, cell_elevation)  # Add this line
+
                     visible_cells.append({
                         'x': dx,
                         'y': dy,
-                        'elevation': cell_elevation
+                        'elevation': cell_elevation,
+                        'vegetation_height': cell_vegetation_height  # Add this line
                     })
+
 
     # Prepare previous positions relative to the current position
     relative_previous_positions = []
