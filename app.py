@@ -27,8 +27,6 @@ VIEWER_HEIGHT_FT = 6
 SQUARE_SIZE_MILES = 0.1
 
 # Terrain types
-TERRAIN_SINE = 'sine'
-TERRAIN_PERLIN = 'perlin'
 TERRAIN_MOUNTAINS = 'mountains' 
 
 # Define the scale for Perlin noise
@@ -67,20 +65,6 @@ def is_river(x, y):
     return abs(y - central_y) < (RIVER_WIDTH // 2)
 
 
-def terrain_height_sine(x, y):
-    A = 500
-    wavelength = 200
-    k = (2 * math.pi) / wavelength
-    terrain_elevation = A * math.sin(k * x) * math.sin(k * y) + 500  # Add 500 ft offset
-    return terrain_elevation
-
-def terrain_height_perlin(x, y):
-    A = 500
-    scale = PERLIN_SCALE
-    noise_value = noise.pnoise2(x * scale, y * scale)
-    terrain_elevation = A * noise_value + 500  # Add 500 ft offset
-    return terrain_elevation
-
 def terrain_height_mountains(x, y):
     A = MOUNTAIN_PEAK_HEIGHT
     scale = MOUNTAIN_SCALE
@@ -97,17 +81,6 @@ def terrain_height_mountains(x, y):
     terrain_elevation = base_height * 500 + peak_height + 500  # Add 500 ft offset
     return terrain_elevation
 
-def terrain_gradient_perlin(x, y):
-    A = 500
-    scale = PERLIN_SCALE
-    delta = 0.01
-    h_center = noise.pnoise2(x * scale, y * scale)
-    h_x1 = noise.pnoise2((x + delta) * scale, y * scale)
-    h_y1 = noise.pnoise2(x * scale, (y + delta) * scale)
-    dh_dx = A * (h_x1 - h_center) / delta
-    dh_dy = A * (h_y1 - h_center) / delta
-    return dh_dx, dh_dy
-
 def terrain_gradient_mountains(x, y):
     delta = 0.01
     h_center = terrain_height_mountains(x, y)
@@ -117,43 +90,22 @@ def terrain_gradient_mountains(x, y):
     dh_dy = (h_y1 - h_center) / delta
     return dh_dx, dh_dy
 
+
 def terrain_height(x, y, terrain_type):
-    if terrain_type == TERRAIN_PERLIN:
-        return terrain_height_perlin(x, y)
-    elif terrain_type == TERRAIN_MOUNTAINS:
+    if terrain_type == TERRAIN_MOUNTAINS:
         return terrain_height_mountains(x, y)
     else:
-        return terrain_height_sine(x, y)
+        # Default to mountains if unknown terrain type
+        return terrain_height_mountains(x, y)
+
 
 def terrain_gradient(x, y, terrain_type):
-    if terrain_type == TERRAIN_PERLIN:
-        return terrain_gradient_perlin(x, y)
-    elif terrain_type == TERRAIN_MOUNTAINS:
+    if terrain_type == TERRAIN_MOUNTAINS:
         return terrain_gradient_mountains(x, y)
-    elif terrain_type == TERRAIN_SINE:
-        return terrain_gradient_sine(x, y)
     else:
-        # Default to sine gradient if unknown terrain type
-        return terrain_gradient_sine(x, y)
+        # Default to mountains gradient if unknown terrain type
+        return terrain_gradient_mountains(x, y)
 
-def terrain_gradient_sine(x, y):
-    A = 500
-    wavelength = 200
-    k = (2 * math.pi) / wavelength
-    delta = 0.01  # Small increment for numerical derivative
-
-    # Calculate central height
-    h_center = A * math.sin(k * x) * math.sin(k * y)
-
-    # Calculate heights at slightly offset positions
-    h_x1 = A * math.sin(k * (x + delta)) * math.sin(k * y)
-    h_y1 = A * math.sin(k * x) * math.sin(k * (y + delta))
-
-    # Compute numerical derivatives
-    dh_dx = (h_x1 - h_center) / delta
-    dh_dy = (h_y1 - h_center) / delta
-
-    return dh_dx, dh_dy
 
 def horizon_distance(viewer_elevation_ft):
     # Set minimum viewer elevation to VIEWER_HEIGHT_FT (6 ft)
@@ -163,6 +115,7 @@ def horizon_distance(viewer_elevation_ft):
     # Limit the horizon distance to a maximum of 20 miles
     max_horizon_distance = 20  # in miles
     return min(calculated_distance, max_horizon_distance)
+
 
 def line_of_sight_visibility(center_x, center_y, terrain_type):
     VERTICAL_SCALE = 1  # Adjust vertical exaggeration
@@ -227,6 +180,7 @@ def line_of_sight_visibility(center_x, center_y, terrain_type):
 
     return visible_cells
 
+
 def vegetation_height(x, y, elevation):
     # Generate base vegetation density using Perlin noise
     base_density = noise.pnoise2(x * VEG_SCALE, y * VEG_SCALE, repeatx=1000, repeaty=1000)
@@ -252,21 +206,59 @@ def vegetation_height(x, y, elevation):
     veg_height = vegetation_density * MAX_VEG_HEIGHT
     return veg_height
 
-def tilt_angle(x, y, terrain_type):
-    dh_dx, dh_dy = terrain_gradient(x, y, terrain_type)
-    gradient_magnitude = math.sqrt(dh_dx**2 + dh_dy**2)
-    theta = math.atan(gradient_magnitude)
-    max_tilt_radians = math.radians(15)
-    if theta > max_tilt_radians:
-        theta = max_tilt_radians
-    return theta
 
-def tilt_direction(x, y, terrain_type):
-    dh_dx, dh_dy = terrain_gradient(x, y, terrain_type)
-    phi = math.atan2(dh_dy, dh_dx)
-    return phi
+def compute_sounds(center_x, center_y, terrain_type, previous_positions):
+    """
+    Computes the sounds to be displayed on the client.
+    """
+    sounds = []
 
-# Calculate visibility range
+    # 1. River Sounds
+    # Define the range within which river sounds are heard
+    RIVER_SOUND_RANGE = 50  # in cells
+
+    # To avoid too many sounds, sample river cells every 10 cells within range
+    for dx in range(-RIVER_SOUND_RANGE, RIVER_SOUND_RANGE + 1, 10):
+        for dy in range(-RIVER_SOUND_RANGE, RIVER_SOUND_RANGE + 1, 10):
+            x = center_x + dx
+            y = center_y + dy
+            if is_river(x, y):
+                distance = math.sqrt(dx**2 + dy**2)
+                if distance <= RIVER_SOUND_RANGE:
+                    intensity = max(1, 100 - distance)  # Simple linear decay
+                    sounds.append({
+                        'x': dx,
+                        'y': dy,
+                        'color': 'blue',
+                        'intensity': intensity
+                    })
+
+    # 2. Center Dot Sound (Player's Position)
+    sounds.append({
+        'x': 0,
+        'y': 0,
+        'color': 'red',
+        'intensity': 100
+    })
+
+    # 3. Previous Movements Sounds
+    # Limit to last 10 movements to avoid clutter
+    recent_positions = previous_positions[-10:]
+    for pos in recent_positions:
+        dx = pos['x'] - center_x
+        dy = pos['y'] - center_y
+        distance = math.sqrt(dx**2 + dy**2)
+        intensity = max(1, 50 - distance)  # Less intense as distance increases
+        sounds.append({
+            'x': dx,
+            'y': dy,
+            'color': 'yellow',
+            'intensity': intensity
+        })
+
+    return sounds
+
+
 def get_visibility_range(x, y, terrain_type):
     theta = tilt_angle(x, y, terrain_type)
     sin_theta = math.sin(theta)
@@ -314,7 +306,7 @@ def start_game():
     session_id = get_session_id()
     data = request.get_json(silent=True) or {}
     player_name = data.get('player_name', 'Player1')
-    terrain_type = data.get('terrain_type', TERRAIN_SINE)
+    terrain_type = TERRAIN_MOUNTAINS  # Fixed to mountains
     lobby_code = generate_lobby_code()
     session_data = {'lobby_code': lobby_code, 'player_name': player_name}
 
@@ -322,7 +314,7 @@ def start_game():
     start_x, start_y = 0, 0  # Starting at the center
     while is_river(start_x, start_y):
         start_y += 10  # Move south until landing on land
-        # Optional: Add bounds checking here
+        # Optional: Add bounds checking here to prevent infinite loop
 
     game_state = {
         'position': {'x': start_x, 'y': start_y},
@@ -409,7 +401,7 @@ def visible_cells():
         return jsonify({'status': 'error', 'message': 'Game state not found'}), 400
 
     game_state = json.loads(game_state_json)
-    terrain_type = game_state.get('terrain_type', TERRAIN_SINE)
+    terrain_type = game_state.get('terrain_type', TERRAIN_MOUNTAINS)
 
     position = game_state['position']
     center_x = position['x']
@@ -419,7 +411,7 @@ def visible_cells():
     if terrain_type == TERRAIN_MOUNTAINS:
         visible_cells = line_of_sight_visibility(center_x, center_y, terrain_type)
     else:
-        # Existing visibility calculation
+        # Existing visibility calculation (now fixed to mountains)
         a_squares, b_squares, phi = get_visibility_range(center_x, center_y, terrain_type)
 
         # Rotate the ellipse to align with the tilt direction
@@ -459,9 +451,13 @@ def visible_cells():
         rel_y = pos['y'] - center_y
         relative_previous_positions.append({'x': rel_x, 'y': rel_y})
 
+    # Compute sounds
+    sounds = compute_sounds(center_x, center_y, terrain_type, game_state.get('previous_positions', []))
+
     response = jsonify({
         'visible_cells': visible_cells,
         'previous_positions': relative_previous_positions,
+        'sounds': sounds,  # Add sounds to the response
         'lobby_code': lobby_code
     })
     response.set_cookie('session_id', session_id)

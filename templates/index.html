@@ -34,14 +34,7 @@
         <h1>Behind Enemy Lines</h1>
         <!-- Input for player name when starting a new game -->
         <input type="text" id="player-name-input" placeholder="Enter Your Name"><br><br>
-        <!-- Terrain type selection -->
-        <label>Select Terrain Type:</label><br>
-        <input type="radio" id="terrain-sine" name="terrain-type" value="sine" checked>
-        <label for="terrain-sine">Sine Wave</label><br>
-        <input type="radio" id="terrain-perlin" name="terrain-type" value="perlin">
-        <label for="terrain-perlin">Perlin Noise</label><br>
-        <input type="radio" id="terrain-mountains" name="terrain-type" value="mountains">
-        <label for="terrain-mountains">Mountains</label><br><br>
+        <!-- Terrain type selection removed since only mountains are used -->
         <button onclick="startGame()">Start New Game</button>
         <button onclick="showJoinForm()">Join Game</button>
         <div id="join-form">
@@ -54,7 +47,7 @@
     <script>
         function startGame() {
             const playerName = document.getElementById('player-name-input').value.trim() || 'Player1';
-            const terrainType = document.querySelector('input[name="terrain-type"]:checked').value;
+            const terrainType = 'mountains'; // Fixed terrain type
             fetch('/start_game', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},

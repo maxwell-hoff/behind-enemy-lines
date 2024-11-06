@@ -8,6 +8,7 @@
             margin: 0;
         }
         #grid-container {
+            position: relative; /* To position sounds overlay */
             display: flex;
             justify-content: center;
             align-items: center;
@@ -17,6 +18,8 @@
             display: grid;
             grid-gap: 3px;
             transform-origin: center;
+            position: relative; /* For z-index stacking */
+            z-index: 1; /* Ensure grid is below sounds */
         }
         .cell {
             width: 3px;
@@ -33,7 +36,7 @@
             top: 10px;
             left: 50%;
             transform: translateX(-50%);
-            z-index: 1;
+            z-index: 2;
             text-align: center;
         }
         #controls button {
@@ -43,7 +46,7 @@
             position: fixed;
             top: 10px;
             left: 10px;
-            z-index: 1;
+            z-index: 2;
         }
         #lobby-code-display {
             position: fixed;
@@ -53,7 +56,24 @@
             background-color: white;
             padding: 5px;
             border: 1px solid black;
-            z-index: 1;
+            z-index: 2;
+        }
+        /* Sounds Overlay */
+        #sounds-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            display: grid;
+            grid-gap: 3px;
+            pointer-events: none; /* Allow clicks to pass through */
+            z-index: 3; /* Above grid */
+        }
+        /* Sound indicators */
+        .sound {
+            width: 3px;
+            height: 3px;
+            border-radius: 50%;
+            opacity: 0.7;
         }
     </style>
 </head>
@@ -75,7 +95,7 @@
             <select id="display-mode" onchange="updateGrid()">
                 <option value="standard">Standard</option>
                 <option value="topographic">Topographic</option>
-                <option value="vegetation">Vegetation</option> <!-- Add this line -->
+                <option value="vegetation">Vegetation</option>
             </select>
         </div>
         <!-- Dropdown menu for movement scale -->
@@ -94,11 +114,12 @@
     </div>
     <div id="grid-container">
         <div id="grid"></div>
+        <div id="sounds-overlay"></div> <!-- Sounds Overlay -->
     </div>
     <script>
         const cellWidth = 3;
         const cellHeight = 3;
-        const gridGap = 1;
+        const gridGap = 3; // Adjusted to match grid-gap in CSS
         const controlsHeight = 150; // Adjusted height to accommodate new controls
         const MAX_VEG_HEIGHT = 50; // Must match the value in app.py
 
@@ -122,6 +143,7 @@
 
                 const visibleCells = data.visible_cells;
                 const previousPositions = data.previous_positions;
+                const sounds = data.sounds; // Retrieve sounds data
                 const displayMode = document.getElementById('display-mode').value;
 
                 const grid = document.getElementById('grid');
@@ -193,6 +215,9 @@
                     }
                 }
 
+                // Render Sounds
+                renderSounds(sounds);
+
                 // Scaling code remains the same
                 const gridContainer = document.getElementById('grid-container');
                 const gridWidth = gridSize * (cellWidth + gridGap);
@@ -253,6 +278,45 @@
             })
             .catch(error => {
                 console.error('Error leaving game:', error);
+            });
+        }
+
+        /**
+         * Renders sounds on the sounds overlay.
+         * @param {Array} sounds - List of sound objects with x, y, color, intensity.
+         */
+        function renderSounds(sounds) {
+            const soundsOverlay = document.getElementById('sounds-overlay');
+            soundsOverlay.innerHTML = '';
+            soundsOverlay.style.gridTemplateColumns = `repeat(${gridSize}, ${cellWidth}px)`;
+            soundsOverlay.style.gridTemplateRows = `repeat(${gridSize}, ${cellHeight}px)`;
+
+            sounds.forEach(sound => {
+                const soundX = sound.x;
+                const soundY = sound.y;
+                const color = sound.color;
+                const intensity = sound.intensity; // Currently unused, can be used for opacity or size
+
+                // Calculate grid position
+                const gridX = soundX + centerIndex;
+                const gridY = soundY + centerIndex;
+
+                // Boundary check
+                if (gridX < 0 || gridX >= gridSize || gridY < 0 || gridY >= gridSize) {
+                    return; // Skip sounds outside the grid
+                }
+
+                const soundCell = document.createElement('div');
+                soundCell.classList.add('sound');
+                soundCell.style.backgroundColor = color;
+                // Optionally, adjust opacity based on intensity
+                soundCell.style.opacity = Math.min(intensity / 100, 1).toString();
+
+                // Position the sound cell
+                soundCell.style.gridColumnStart = gridX + 1; // gridColumnStart is 1-based
+                soundCell.style.gridRowStart = gridY + 1;    // gridRowStart is 1-based
+
+                soundsOverlay.appendChild(soundCell);
             });
         }
 
