@@ -49,7 +49,6 @@ MAX_VEG_DENSITY = 0.1  # Maximum vegetation density (0 to 1)
 VEG_DISTRIBUTION_COEF = 1.5  # Coefficient to control distribution skewness
 ELEVATION_VEG_COEF = 2000  # Elevation coefficient to adjust vegetation with elevation
 
-
 def is_river(x, y):
     """
     Determines if the cell at (x, y) is part of the river.
@@ -63,7 +62,6 @@ def is_river(x, y):
 
     # Check if the cell is within the river's width around the central path
     return abs(y - central_y) < (RIVER_WIDTH // 2)
-
 
 def terrain_height_mountains(x, y):
     A = MOUNTAIN_PEAK_HEIGHT
@@ -90,7 +88,6 @@ def terrain_gradient_mountains(x, y):
     dh_dy = (h_y1 - h_center) / delta
     return dh_dx, dh_dy
 
-
 def terrain_height(x, y, terrain_type):
     if terrain_type == TERRAIN_MOUNTAINS:
         return terrain_height_mountains(x, y)
@@ -98,14 +95,12 @@ def terrain_height(x, y, terrain_type):
         # Default to mountains if unknown terrain type
         return terrain_height_mountains(x, y)
 
-
 def terrain_gradient(x, y, terrain_type):
     if terrain_type == TERRAIN_MOUNTAINS:
         return terrain_gradient_mountains(x, y)
     else:
         # Default to mountains gradient if unknown terrain type
         return terrain_gradient_mountains(x, y)
-
 
 def horizon_distance(viewer_elevation_ft):
     # Set minimum viewer elevation to VIEWER_HEIGHT_FT (6 ft)
@@ -115,7 +110,6 @@ def horizon_distance(viewer_elevation_ft):
     # Limit the horizon distance to a maximum of 20 miles
     max_horizon_distance = 20  # in miles
     return min(calculated_distance, max_horizon_distance)
-
 
 def line_of_sight_visibility(center_x, center_y, terrain_type):
     VERTICAL_SCALE = 1  # Adjust vertical exaggeration
@@ -180,7 +174,6 @@ def line_of_sight_visibility(center_x, center_y, terrain_type):
 
     return visible_cells
 
-
 def vegetation_height(x, y, elevation):
     # Generate base vegetation density using Perlin noise
     base_density = noise.pnoise2(x * VEG_SCALE, y * VEG_SCALE, repeatx=1000, repeaty=1000)
@@ -206,7 +199,6 @@ def vegetation_height(x, y, elevation):
     veg_height = vegetation_density * MAX_VEG_HEIGHT
     return veg_height
 
-
 def compute_sounds(center_x, center_y, terrain_type, previous_positions):
     """
     Computes the sounds to be displayed on the client.
@@ -217,7 +209,7 @@ def compute_sounds(center_x, center_y, terrain_type, previous_positions):
     # Define the range within which river sounds are heard
     RIVER_SOUND_RANGE = 50  # in cells
 
-    # To avoid too many sounds, sample river cells every 10 cells within range
+    # Sample river cells every 10 cells within range
     for dx in range(-RIVER_SOUND_RANGE, RIVER_SOUND_RANGE + 1, 10):
         for dy in range(-RIVER_SOUND_RANGE, RIVER_SOUND_RANGE + 1, 10):
             x = center_x + dx
@@ -225,20 +217,17 @@ def compute_sounds(center_x, center_y, terrain_type, previous_positions):
             if is_river(x, y):
                 distance = math.sqrt(dx**2 + dy**2)
                 if distance <= RIVER_SOUND_RANGE:
-                    intensity = max(1, 100 - distance)  # Simple linear decay
                     sounds.append({
                         'x': dx,
                         'y': dy,
-                        'color': 'blue',
-                        'intensity': intensity
+                        'color': 'blue'
                     })
 
     # 2. Center Dot Sound (Player's Position)
     sounds.append({
         'x': 0,
         'y': 0,
-        'color': 'red',
-        'intensity': 100
+        'color': 'red'
     })
 
     # 3. Previous Movements Sounds
@@ -247,17 +236,30 @@ def compute_sounds(center_x, center_y, terrain_type, previous_positions):
     for pos in recent_positions:
         dx = pos['x'] - center_x
         dy = pos['y'] - center_y
-        distance = math.sqrt(dx**2 + dy**2)
-        intensity = max(1, 50 - distance)  # Less intense as distance increases
         sounds.append({
             'x': dx,
             'y': dy,
-            'color': 'yellow',
-            'intensity': intensity
+            'color': 'yellow'
         })
 
-    return sounds
+    # 4. Random Sounds Based on Vegetation Density
+    # Use the same distribution as vegetation
+    RANDOM_SOUND_RANGE = 100  # in cells
+    for dx in range(-RANDOM_SOUND_RANGE, RANDOM_SOUND_RANGE + 1, 5):
+        for dy in range(-RANDOM_SOUND_RANGE, RANDOM_SOUND_RANGE + 1, 5):
+            x = center_x + dx
+            y = center_y + dy
+            # Probability based on vegetation density
+            veg_height = vegetation_height(x, y, terrain_height(x, y, terrain_type))
+            veg_density = veg_height / MAX_VEG_HEIGHT  # Normalize to [0,1]
+            if random.random() < veg_density * 0.05:  # 5% base probability
+                sounds.append({
+                    'x': dx,
+                    'y': dy,
+                    'color': 'green'
+                })
 
+    return sounds
 
 def get_visibility_range(x, y, terrain_type):
     theta = tilt_angle(x, y, terrain_type)
