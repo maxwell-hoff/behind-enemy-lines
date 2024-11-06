@@ -39,7 +39,7 @@ MOUNTAIN_PEAK_HEIGHT = 500  # Increased height of the mountain peaks
 MOUNTAIN_SCALE = 0.01  # Controls the size of the mountains
 
 # River parameters
-RIVER_WIDTH = 5  # Width of the river in cells
+RIVER_WIDTH = 10  # Increased width of the river in cells
 RIVER_CENTER_X = 0  # X-coordinate for the center of the river path
 RIVER_FLOW_DIRECTION = 'south'  # Direction the river flows ('south' for this example)
 
@@ -322,6 +322,7 @@ def start_game():
     start_x, start_y = 0, 0  # Starting at the center
     while is_river(start_x, start_y):
         start_y += 10  # Move south until landing on land
+        # Optional: Add bounds checking here
 
     game_state = {
         'position': {'x': start_x, 'y': start_y},
@@ -509,18 +510,21 @@ def move():
     else:
         return jsonify({'status': 'error', 'message': 'Invalid direction'}), 400
 
-    # Record the starting position
-    x0, y0 = position['x'], position['y']
+    # Generate the new position(s) based on scale
+    new_positions = []
+    for step in range(1, scale + 1):
+        new_x = position['x'] + dx * step
+        new_y = position['y'] + dy * step
+        if is_river(new_x, new_y):
+            return jsonify({'status': 'error', 'message': 'Cannot move into the river!'}), 400
+        new_positions.append({'x': new_x, 'y': new_y})
 
-    # Generate the positions along the path (excluding the starting position)
-    path_positions = [{'x': x0 + dx * step, 'y': y0 + dy * step} for step in range(1, scale + 1)]
-
-    # Append the path positions to previous_positions
-    previous_positions.extend(path_positions)
+    # Append the new positions to previous_positions
+    previous_positions.extend(new_positions)
 
     # Update the current position to the final position
-    position['x'] = x0 + dx * scale
-    position['y'] = y0 + dy * scale
+    position['x'] += dx * scale
+    position['y'] += dy * scale
 
     # Limit the length of previous_positions to avoid too much data
     if len(previous_positions) > 100:
