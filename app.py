@@ -111,6 +111,30 @@ def horizon_distance(viewer_elevation_ft):
     max_horizon_distance = 20  # in miles
     return min(calculated_distance, max_horizon_distance)
 
+def compute_sound_level(x, y, center_x, center_y):
+    """
+    Computes the sound level at a given cell based on proximity to river,
+    vegetation density, and random ambient sounds.
+    """
+    sound_level = 0.0
+
+    # Sound from river
+    if is_river(x, y):
+        distance_to_river = math.sqrt((x - center_x) ** 2 + (y - center_y) ** 2)
+        river_sound_intensity = max(0, (50 - distance_to_river) / 50)  # Normalized [0,1]
+        sound_level += river_sound_intensity * 10  # Adjust factor as needed
+
+    # Sound from vegetation (e.g., wildlife)
+    veg_height = vegetation_height(x, y, terrain_height(x, y, TERRAIN_MOUNTAINS))
+    veg_density = veg_height / MAX_VEG_HEIGHT  # Normalized [0,1]
+    sound_level += veg_density * 5  # Adjust factor as needed
+
+    # Ambient sound
+    ambient_sound = random.uniform(0, 0.5)
+    sound_level += ambient_sound
+
+    return sound_level
+
 def line_of_sight_visibility(center_x, center_y, terrain_type):
     VERTICAL_SCALE = 1  # Adjust vertical exaggeration
 
@@ -160,12 +184,17 @@ def line_of_sight_visibility(center_x, center_y, terrain_type):
                 # Point is visible
                 cell_elevation = target_terrain_elevation
                 cell_vegetation_height = target_veg_height
+
+                # Compute sound level for the cell
+                sound_level = compute_sound_level(x_int, y_int, center_x, center_y)
+
                 visible_cells.append({
                     'x': x_int - center_x,
                     'y': y_int - center_y,
                     'elevation': cell_elevation,
                     'vegetation_height': cell_vegetation_height,
-                    'water': target_water  # Add water flag
+                    'water': target_water,  # Add water flag
+                    'sound_level': sound_level  # Add sound level
                 })
                 prev_max_angle = elevation_angle
             else:

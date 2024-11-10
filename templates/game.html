@@ -145,7 +145,6 @@
 
                 const visibleCells = data.visible_cells;
                 const previousPositions = data.previous_positions;
-                const sounds = data.sounds; // Retrieve sounds data
                 const displayMode = document.getElementById('display-mode').value;
 
                 const grid = document.getElementById('grid');
@@ -155,7 +154,7 @@
 
                 document.getElementById('lobby-code').textContent = data.lobby_code;
 
-                // Create a Map of visible cell positions and elevations
+                // Create a Map of visible cell positions and data
                 const visibleCellsMap = new Map();
                 visibleCells.forEach(cell => {
                     const key = `${cell.x},${cell.y}`;
@@ -180,6 +179,7 @@
                             const elevation = cellData.elevation;
                             const vegetationHeight = cellData.vegetation_height || 0;
                             const isWater = cellData.water || false;
+                            const soundLevel = cellData.sound_level || 0;
 
                             if (x === 0 && y === 0) {
                                 cell.classList.add('center');
@@ -204,17 +204,10 @@
                                         cell.style.backgroundColor = 'grey'; // No vegetation
                                     }
                                 } else if (displayMode === 'sounds') {
-                                    // In 'sounds' mode, hide the terrain
-                                    // Only show center and previous positions
-                                    if (x === 0 && y === 0) {
-                                        cell.classList.add('center');
-                                        cell.style.backgroundColor = 'orange';
-                                    } else if (previousPositionsSet.has(cellKey)) {
-                                        cell.classList.add('previous');
-                                        cell.style.backgroundColor = 'lightgrey';
-                                    } else {
-                                        cell.style.backgroundColor = 'transparent';
-                                    }
+                                    // Use sound level to determine color intensity
+                                    const soundRatio = Math.min(soundLevel / 15, 1); // Assuming max soundLevel is around 15
+                                    const redIntensity = Math.floor(soundRatio * 255);
+                                    cell.style.backgroundColor = `rgb(${redIntensity}, 0, 0)`; // Shades of red
                                 } else {
                                     // Standard mode
                                     cell.style.backgroundColor = 'grey';
@@ -229,13 +222,8 @@
                     }
                 }
 
-                // Render Sounds based on display mode
-                if (displayMode === 'sounds') {
-                    renderSounds(sounds);
-                    document.getElementById('sounds-overlay').style.visibility = 'visible';
-                } else {
-                    document.getElementById('sounds-overlay').style.visibility = 'hidden';
-                }
+                // Hide the sounds overlay since we're now using cell colors
+                document.getElementById('sounds-overlay').style.visibility = 'hidden';
 
                 // Scaling code remains the same
                 const gridContainer = document.getElementById('grid-container');
@@ -252,7 +240,7 @@
                 grid.style.transform = `scale(${scale})`;
                 grid.style.transformOrigin = 'center';
             });
-        } // <-- Added missing closing brace here
+        } // Ensure all functions are properly closed
 
         function getColorForElevation(elevation) {
             const ratio = (elevation - GLOBAL_MIN_ELEVATION) / (GLOBAL_MAX_ELEVATION - GLOBAL_MIN_ELEVATION);
