@@ -251,92 +251,93 @@
 
                 grid.style.transform = `scale(${scale})`;
                 grid.style.transformOrigin = 'center';
-            }
+            });
+        } // <-- Added missing closing brace here
 
-            function getColorForElevation(elevation) {
-                const ratio = (elevation - GLOBAL_MIN_ELEVATION) / (GLOBAL_MAX_ELEVATION - GLOBAL_MIN_ELEVATION);
-                const hue = (1 - ratio) * 240;
-                return `hsl(${hue}, 100%, 50%)`;
-            }
+        function getColorForElevation(elevation) {
+            const ratio = (elevation - GLOBAL_MIN_ELEVATION) / (GLOBAL_MAX_ELEVATION - GLOBAL_MIN_ELEVATION);
+            const hue = (1 - ratio) * 240;
+            return `hsl(${hue}, 100%, 50%)`;
+        }
 
-            function move(direction) {
-                const movementScale = parseInt(document.getElementById('movement-scale').value) || 1;
-                fetch('/move', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({'direction': direction, 'scale': movementScale})
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.status === 'success') {
-                        updateGrid();
-                    } else {
-                        alert(data.message || 'Unable to move.');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error moving:', error);
-                });
-            }
+        function move(direction) {
+            const movementScale = parseInt(document.getElementById('movement-scale').value) || 1;
+            fetch('/move', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({'direction': direction, 'scale': movementScale})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    updateGrid();
+                } else {
+                    alert(data.message || 'Unable to move.');
+                }
+            })
+            .catch(error => {
+                console.error('Error moving:', error);
+            });
+        }
 
-            function leaveGame() {
-                fetch('/leave_game', {
-                    method: 'POST'
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.status === 'success') {
-                        window.location.href = '/';
-                    } else {
-                        alert('Error leaving game.');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error leaving game:', error);
-                });
-            }
+        function leaveGame() {
+            fetch('/leave_game', {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    window.location.href = '/';
+                } else {
+                    alert('Error leaving game.');
+                }
+            })
+            .catch(error => {
+                console.error('Error leaving game:', error);
+            });
+        }
 
-            /**
-             * Renders sounds on the sounds overlay.
-             * @param {Array} sounds - List of sound objects with x, y, color.
-             */
-            function renderSounds(sounds) {
-                const soundsOverlay = document.getElementById('sounds-overlay');
-                soundsOverlay.innerHTML = '';
-                soundsOverlay.style.gridTemplateColumns = `repeat(${gridSize}, ${cellWidth}px)`;
-                soundsOverlay.style.gridTemplateRows = `repeat(${gridSize}, ${cellHeight}px)`;
+        /**
+         * Renders sounds on the sounds overlay.
+         * @param {Array} sounds - List of sound objects with x, y, color.
+         */
+        function renderSounds(sounds) {
+            const soundsOverlay = document.getElementById('sounds-overlay');
+            soundsOverlay.innerHTML = '';
+            soundsOverlay.style.gridTemplateColumns = `repeat(${gridSize}, ${cellWidth}px)`;
+            soundsOverlay.style.gridTemplateRows = `repeat(${gridSize}, ${cellHeight}px)`;
 
-                sounds.forEach(sound => {
-                    const soundX = sound.x;
-                    const soundY = sound.y;
-                    const color = sound.color;
+            sounds.forEach(sound => {
+                const soundX = sound.x;
+                const soundY = sound.y;
+                const color = sound.color;
 
-                    // Calculate grid position
-                    const gridX = soundX + centerIndex;
-                    const gridY = soundY + centerIndex;
+                // Calculate grid position
+                const gridX = soundX + centerIndex;
+                const gridY = soundY + centerIndex;
 
-                    // Boundary check
-                    if (gridX < 0 || gridX >= gridSize || gridY < 0 || gridY >= gridSize) {
-                        return; // Skip sounds outside the grid
-                    }
+                // Boundary check
+                if (gridX < 0 || gridX >= gridSize || gridY < 0 || gridY >= gridSize) {
+                    return; // Skip sounds outside the grid
+                }
 
-                    const soundCell = document.createElement('div');
-                    soundCell.classList.add('sound');
-                    soundCell.style.backgroundColor = color;
+                const soundCell = document.createElement('div');
+                soundCell.classList.add('sound');
+                soundCell.style.backgroundColor = color;
 
-                    // Position the sound cell
-                    soundCell.style.gridColumnStart = gridX + 1; // gridColumnStart is 1-based
-                    soundCell.style.gridRowStart = gridY + 1;    // gridRowStart is 1-based
+                // Position the sound cell
+                soundCell.style.gridColumnStart = gridX + 1; // gridColumnStart is 1-based
+                soundCell.style.gridRowStart = gridY + 1;    // gridRowStart is 1-based
 
-                    soundsOverlay.appendChild(soundCell);
-                });
-            }
+                soundsOverlay.appendChild(soundCell);
+            });
+        }
 
-            // Initial grid update
-            updateGrid();
+        // Initial grid update
+        updateGrid();
 
-            // Periodically update the grid
-            setInterval(updateGrid, 1000);
+        // Periodically update the grid
+        setInterval(updateGrid, 1000);
     </script>
 </body>
 </html>

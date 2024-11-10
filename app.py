@@ -174,6 +174,20 @@ def line_of_sight_visibility(center_x, center_y, terrain_type):
 
     return visible_cells
 
+def tilt_angle(x, y, terrain_type):
+    dh_dx, dh_dy = terrain_gradient(x, y, terrain_type)
+    gradient_magnitude = math.sqrt(dh_dx**2 + dh_dy**2)
+    theta = math.atan(gradient_magnitude)
+    max_tilt_radians = math.radians(15)
+    if theta > max_tilt_radians:
+        theta = max_tilt_radians
+    return theta
+
+def tilt_direction(x, y, terrain_type):
+    dh_dx, dh_dy = terrain_gradient(x, y, terrain_type)
+    phi = math.atan2(dh_dy, dh_dx)
+    return phi
+
 def vegetation_height(x, y, elevation):
     # Generate base vegetation density using Perlin noise
     base_density = noise.pnoise2(x * VEG_SCALE, y * VEG_SCALE, repeatx=1000, repeaty=1000)
