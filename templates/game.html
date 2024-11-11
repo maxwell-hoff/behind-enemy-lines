@@ -121,17 +121,29 @@
     <script>
         const cellWidth = 3;
         const cellHeight = 3;
-        const gridGap = 3; // Adjusted to match grid-gap in CSS
-        const controlsHeight = 150; // Adjusted height to accommodate new controls
+        const gridGap = 1; // Adjusted for better visualization
+        const controlsHeight = 150;
         const MAX_VEG_HEIGHT = 50; // Must match the value in app.py
 
         // Define fixed grid size
-        const gridSize = 401; // Adjust as needed for performance
-        const centerIndex = Math.floor(gridSize / 2); // Center index of the grid
+        const gridSize = 201; // Adjusted for performance
+        const centerIndex = Math.floor(gridSize / 2);
 
         // Global elevation constants
-        const GLOBAL_MIN_ELEVATION = 0;    // Adjust based on your terrain
-        const GLOBAL_MAX_ELEVATION = 2000; // Adjust based on your terrain's maximum elevation
+        const GLOBAL_MIN_ELEVATION = 0;
+        const GLOBAL_MAX_ELEVATION = 2000;
+
+        // Sound colors mapping
+        const soundColors = {
+            'river': {
+                1: '#87CEFA', // LightSkyBlue
+                2: '#00008B'  // DarkBlue
+            },
+            'vegetation': {
+                1: '#90EE90', // LightGreen
+                2: '#006400'  // DarkGreen
+            }
+        };
 
         function updateGrid() {
             fetch('/visible_cells')
@@ -179,7 +191,6 @@
                             const elevation = cellData.elevation;
                             const vegetationHeight = cellData.vegetation_height || 0;
                             const isWater = cellData.water || false;
-                            const soundLevel = cellData.sound_level || 0;
 
                             if (x === 0 && y === 0) {
                                 cell.classList.add('center');
@@ -189,41 +200,37 @@
                                 cell.style.backgroundColor = 'lightgrey';
                             } else {
                                 if (displayMode === 'topographic') {
-                                    // Use elevation color
                                     const terrainColor = getColorForElevation(elevation);
                                     cell.style.backgroundColor = terrainColor;
                                 } else if (displayMode === 'vegetation') {
-                                    // Use vegetation color or water
                                     if (isWater) {
-                                        cell.style.backgroundColor = 'blue';  // Render water as blue
+                                        cell.style.backgroundColor = 'blue';
                                     } else if (vegetationHeight > 0) {
                                         const vegRatio = vegetationHeight / MAX_VEG_HEIGHT;
-                                        const greenIntensity = Math.floor(vegRatio * 200) + 55; // Ensures the color isn't too dark
+                                        const greenIntensity = Math.floor(vegRatio * 200) + 55;
                                         cell.style.backgroundColor = `rgb(0, ${greenIntensity}, 0)`;
                                     } else {
-                                        cell.style.backgroundColor = 'grey'; // No vegetation
+                                        cell.style.backgroundColor = 'grey';
                                     }
                                 } else if (displayMode === 'sounds') {
-                                    // Use sound level to determine color intensity
-                                    const soundRatio = Math.min(soundLevel / 15, 1); // Assuming max soundLevel is around 15
-                                    const redIntensity = Math.floor(soundRatio * 255);
-                                    cell.style.backgroundColor = `rgb(${redIntensity}, 0, 0)`; // Shades of red
+                                    const soundSources = cellData.sound_sources || {};
+                                    if (Object.keys(soundSources).length > 0) {
+                                        const color = getColorForSound(soundSources);
+                                        cell.style.backgroundColor = color;
+                                    } else {
+                                        cell.style.backgroundColor = 'transparent';
+                                    }
                                 } else {
-                                    // Standard mode
                                     cell.style.backgroundColor = 'grey';
                                 }
                             }
                         } else {
-                            // Cell is not visible; make it transparent or set a default style
                             cell.style.backgroundColor = 'transparent';
                         }
 
                         grid.appendChild(cell);
                     }
                 }
-
-                // Hide the sounds overlay since we're now using cell colors
-                document.getElementById('sounds-overlay').style.visibility = 'hidden';
 
                 // Scaling code remains the same
                 const gridContainer = document.getElementById('grid-container');
@@ -240,12 +247,31 @@
                 grid.style.transform = `scale(${scale})`;
                 grid.style.transformOrigin = 'center';
             });
-        } // Ensure all functions are properly closed
+        }
 
         function getColorForElevation(elevation) {
             const ratio = (elevation - GLOBAL_MIN_ELEVATION) / (GLOBAL_MAX_ELEVATION - GLOBAL_MIN_ELEVATION);
             const hue = (1 - ratio) * 240;
             return `hsl(${hue}, 100%, 50%)`;
+        }
+
+        function getColorForSound(soundSources) {
+            let maxLevel = 0;
+            let dominantSource = null;
+
+            for (let source in soundSources) {
+                const level = soundSources[source];
+                if (level > maxLevel) {
+                    maxLevel = level;
+                    dominantSource = source;
+                }
+            }
+
+            if (dominantSource && soundColors[dominantSource]) {
+                return soundColors[dominantSource][maxLevel] || 'transparent';
+            }
+
+            return 'transparent';
         }
 
         function move(direction) {

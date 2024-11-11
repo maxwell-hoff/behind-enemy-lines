@@ -49,6 +49,14 @@ MAX_VEG_DENSITY = 0.1  # Maximum vegetation density (0 to 1)
 VEG_DISTRIBUTION_COEF = 1.5  # Coefficient to control distribution skewness
 ELEVATION_VEG_COEF = 2000  # Elevation coefficient to adjust vegetation with elevation
 
+# Sound ranges for river
+RIVER_SOUND_RANGE_NEAR = 20  # Cells
+RIVER_SOUND_RANGE_FAR = 50   # Cells
+
+# Sound ranges for vegetation
+VEG_SOUND_RANGE_NEAR = 10    # Cells
+VEG_SOUND_RANGE_FAR = 30     # Cells
+
 def is_river(x, y):
     """
     Determines if the cell at (x, y) is part of the river.
@@ -111,29 +119,35 @@ def horizon_distance(viewer_elevation_ft):
     max_horizon_distance = 20  # in miles
     return min(calculated_distance, max_horizon_distance)
 
-def compute_sound_level(x, y, center_x, center_y):
+def compute_sound_levels(x, y, center_x, center_y):
     """
-    Computes the sound level at a given cell based on proximity to river,
-    vegetation density, and random ambient sounds.
+    Computes the sound levels for different sound sources at a given cell.
+    Returns a dictionary of sound sources and their levels.
     """
-    sound_level = 0.0
+    sound_sources = {}
 
     # Sound from river
     if is_river(x, y):
-        distance_to_river = math.sqrt((x - center_x) ** 2 + (y - center_y) ** 2)
-        river_sound_intensity = max(0, (50 - distance_to_river) / 50)  # Normalized [0,1]
-        sound_level += river_sound_intensity * 10  # Adjust factor as needed
+        dx = x - center_x
+        dy = y - center_y
+        distance_to_player = math.sqrt(dx**2 + dy**2)
+        if distance_to_player <= RIVER_SOUND_RANGE_NEAR:
+            sound_sources['river'] = 2  # Near level
+        elif distance_to_player <= RIVER_SOUND_RANGE_FAR:
+            sound_sources['river'] = 1  # Far level
 
-    # Sound from vegetation (e.g., wildlife)
+    # Sound from vegetation
     veg_height = vegetation_height(x, y, terrain_height(x, y, TERRAIN_MOUNTAINS))
-    veg_density = veg_height / MAX_VEG_HEIGHT  # Normalized [0,1]
-    sound_level += veg_density * 5  # Adjust factor as needed
+    if veg_height > 0:
+        dx = x - center_x
+        dy = y - center_y
+        distance_to_player = math.sqrt(dx**2 + dy**2)
+        if distance_to_player <= VEG_SOUND_RANGE_NEAR:
+            sound_sources['vegetation'] = 2  # Near level
+        elif distance_to_player <= VEG_SOUND_RANGE_FAR:
+            sound_sources['vegetation'] = 1  # Far level
 
-    # Ambient sound
-    ambient_sound = random.uniform(0, 0.5)
-    sound_level += ambient_sound
-
-    return sound_level
+    return sound_sources
 
 def line_of_sight_visibility(center_x, center_y, terrain_type):
     VERTICAL_SCALE = 1  # Adjust vertical exaggeration
@@ -180,25 +194,24 @@ def line_of_sight_visibility(center_x, center_y, terrain_type):
 
             elevation_angle = math.degrees(math.atan2(delta_h, distance_ft))
 
-            if elevation_angle > prev_max_angle:
+            iif elevation_angle > prev_max_angle:
                 # Point is visible
                 cell_elevation = target_terrain_elevation
                 cell_vegetation_height = target_veg_height
 
-                # Compute sound level for the cell
-                sound_level = compute_sound_level(x_int, y_int, center_x, center_y)
+                # Compute sound levels for the cell
+                sound_sources = compute_sound_levels(x_int, y_int, center_x, center_y)
 
                 visible_cells.append({
                     'x': x_int - center_x,
                     'y': y_int - center_y,
                     'elevation': cell_elevation,
                     'vegetation_height': cell_vegetation_height,
-                    'water': target_water,  # Add water flag
-                    'sound_level': sound_level  # Add sound level
+                    'water': target_water,
+                    'sound_sources': sound_sources  # Include sound sources
                 })
                 prev_max_angle = elevation_angle
             else:
-                # Line of sight blocked; break out of loop
                 break
 
     return visible_cells
