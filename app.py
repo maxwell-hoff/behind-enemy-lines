@@ -392,6 +392,7 @@ def start_game():
     while is_river(start_x, start_y):
         start_y += 10  # Move south until landing on land
         # Optional: Add bounds checking here to prevent infinite loop
+
     # Initialize enemies
     enemies = []
     num_enemies = 2
@@ -418,8 +419,10 @@ def start_game():
         'player_names': [player_name],
         'ready_statuses': [False],
         'game_started': False,
-        'terrain_type': terrain_type
+        'terrain_type': terrain_type,
+        'enemies': enemies  # Add enemies to game state
     }
+
     redis_client.set(lobby_code, json.dumps(game_state), ex=3600)
 
     save_session_data(session_id, session_data)
