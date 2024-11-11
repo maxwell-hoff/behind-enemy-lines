@@ -194,7 +194,7 @@ def line_of_sight_visibility(center_x, center_y, terrain_type):
 
             elevation_angle = math.degrees(math.atan2(delta_h, distance_ft))
 
-            iif elevation_angle > prev_max_angle:
+            if elevation_angle > prev_max_angle:
                 # Point is visible
                 cell_elevation = target_terrain_elevation
                 cell_vegetation_height = target_veg_height
