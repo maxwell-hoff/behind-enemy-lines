@@ -136,17 +136,6 @@ def compute_sound_levels(x, y, center_x, center_y):
         elif distance_to_player <= RIVER_SOUND_RANGE_FAR:
             sound_sources['river'] = 1  # Far level
 
-    # Sound from vegetation
-    veg_height = vegetation_height(x, y, terrain_height(x, y, TERRAIN_MOUNTAINS))
-    if veg_height > 0:
-        dx = x - center_x
-        dy = y - center_y
-        distance_to_player = math.sqrt(dx**2 + dy**2)
-        if distance_to_player <= VEG_SOUND_RANGE_NEAR:
-            sound_sources['vegetation'] = 2  # Near level
-        elif distance_to_player <= VEG_SOUND_RANGE_FAR:
-            sound_sources['vegetation'] = 1  # Far level
-
     return sound_sources
 
 def line_of_sight_visibility(center_x, center_y, terrain_type):
@@ -317,6 +306,36 @@ def compute_sounds(center_x, center_y, terrain_type, previous_positions):
 
     return sounds
 
+def compute_enemy_fov(enemy_x, enemy_y, enemy_direction, fov_angle=60, fov_range=50):
+    """
+    Computes the cells within the enemy's field of vision cone.
+    Returns a set of (dx, dy) tuples relative to the enemy's position.
+    """
+    fov_cells = set()
+    half_angle = fov_angle / 2
+    start_angle = enemy_direction - half_angle
+    end_angle = enemy_direction + half_angle
+
+    for angle in range(int(start_angle), int(end_angle) + 1):
+        angle_rad = math.radians(angle % 360)
+        for d in range(1, fov_range + 1):
+            dx = int(round(d * math.cos(angle_rad)))
+            dy = int(round(d * math.sin(angle_rad)))
+            fov_cells.add((dx, dy))
+    return fov_cells
+
+def compute_enemy_hearing(enemy_x, enemy_y, hearing_range=100):
+    """
+    Computes the cells within the enemy's hearing circle.
+    Returns a set of (dx, dy) tuples relative to the enemy's position.
+    """
+    hearing_cells = set()
+    for dx in range(-hearing_range, hearing_range + 1):
+        for dy in range(-hearing_range, hearing_range + 1):
+            if dx**2 + dy**2 <= hearing_range**2:
+                hearing_cells.add((dx, dy))
+    return hearing_cells
+
 def get_visibility_range(x, y, terrain_type):
     theta = tilt_angle(x, y, terrain_type)
     sin_theta = math.sin(theta)
@@ -373,6 +392,24 @@ def start_game():
     while is_river(start_x, start_y):
         start_y += 10  # Move south until landing on land
         # Optional: Add bounds checking here to prevent infinite loop
+    # Initialize enemies
+    enemies = []
+    num_enemies = 2
+
+    for _ in range(num_enemies):
+        while True:
+            # Generate random positions for enemies
+            enemy_x = random.randint(-500, 500)
+            enemy_y = random.randint(-500, 500)
+            if not is_river(enemy_x, enemy_y):
+                break
+        # Assign random direction for enemy's field of vision (in degrees)
+        enemy_direction = random.uniform(0, 360)
+        enemies.append({
+            'x': enemy_x,
+            'y': enemy_y,
+            'direction': enemy_direction
+        })
 
     game_state = {
         'position': {'x': start_x, 'y': start_y},
@@ -512,10 +549,39 @@ def visible_cells():
     # Compute sounds
     sounds = compute_sounds(center_x, center_y, terrain_type, game_state.get('previous_positions', []))
 
+    # Create a set for quick lookup
+    visible_cells_set = set((cell['x'], cell['y']) for cell in visible_cells)
+
+    # Get enemies from game state
+    enemies = game_state.get('enemies', [])
+
+    for enemy in enemies:
+        enemy_x = enemy['x']
+        enemy_y = enemy['y']
+        enemy_direction = enemy['direction']
+
+        # Compute FOV and hearing ranges
+        fov_cells = compute_enemy_fov(enemy_x, enemy_y, enemy_direction)
+        hearing_cells = compute_enemy_hearing(enemy_x, enemy_y)
+
+        # Mark cells in visible_cells
+        for cell in visible_cells:
+            cell_x_global = cell['x'] + center_x
+            cell_y_global = cell['y'] + center_y
+
+            dx_enemy = cell_x_global - enemy_x
+            dy_enemy = cell_y_global - enemy_y
+
+            if (dx_enemy, dy_enemy) == (0, 0):
+                cell['enemy'] = True  # Enemy position
+            elif (dx_enemy, dy_enemy) in fov_cells:
+                cell['enemy_fov'] = True
+            elif (dx_enemy, dy_enemy) in hearing_cells:
+                cell['enemy_hearing'] = True
+
     response = jsonify({
         'visible_cells': visible_cells,
         'previous_positions': relative_previous_positions,
-        'sounds': sounds,  # Add sounds to the response
         'lobby_code': lobby_code
     })
     response.set_cookie('session_id', session_id)

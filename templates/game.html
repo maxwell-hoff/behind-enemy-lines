@@ -166,7 +166,6 @@
 
                 document.getElementById('lobby-code').textContent = data.lobby_code;
 
-                // Create a Map of visible cell positions and data
                 const visibleCellsMap = new Map();
                 visibleCells.forEach(cell => {
                     const key = `${cell.x},${cell.y}`;
@@ -175,13 +174,11 @@
 
                 const previousPositionsSet = new Set(previousPositions.map(pos => `${pos.x},${pos.y}`));
 
-                // Render the grid with fixed size
                 for (let gridY = 0; gridY < gridSize; gridY++) {
                     for (let gridX = 0; gridX < gridSize; gridX++) {
                         const cell = document.createElement('div');
                         cell.classList.add('cell');
 
-                        // Calculate relative position from center
                         const x = gridX - centerIndex;
                         const y = gridY - centerIndex;
 
@@ -220,8 +217,16 @@
                                     } else {
                                         cell.style.backgroundColor = 'transparent';
                                     }
-                                } else {
-                                    cell.style.backgroundColor = 'grey';
+                                } else { // Standard mode
+                                    if (cellData.enemy) {
+                                        cell.style.backgroundColor = 'red';
+                                    } else if (cellData.enemy_fov) {
+                                        cell.style.backgroundColor = '#FFA07A'; // LightSalmon
+                                    } else if (cellData.enemy_hearing) {
+                                        cell.style.backgroundColor = '#FFC0CB'; // Pink
+                                    } else {
+                                        cell.style.backgroundColor = 'grey';
+                                    }
                                 }
                             }
                         } else {
