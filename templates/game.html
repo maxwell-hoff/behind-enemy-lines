@@ -70,11 +70,12 @@
             visibility: hidden; /* Hidden by default */
         }
         /* Sound indicators */
+        /* Sound indicators */
         .sound {
             width: 3px;
             height: 3px;
             border-radius: 50%;
-            opacity: 0.7;
+            /* Remove fixed opacity */
         }
     </style>
 </head>
@@ -146,6 +147,7 @@
         };
 
         function updateGrid() {
+            const soundsOverlay = document.getElementById('sounds-overlay');
             fetch('/visible_cells')
             .then(response => response.json())
             .then(data => {
@@ -251,6 +253,16 @@
 
                 grid.style.transform = `scale(${scale})`;
                 grid.style.transformOrigin = 'center';
+
+                const sounds = data.sounds;
+                renderSounds(sounds);
+
+                // Control the visibility of the sounds overlay
+                if (displayMode === 'sounds') {
+                    soundsOverlay.style.visibility = 'visible';
+                } else {
+                    soundsOverlay.style.visibility = 'hidden';
+                }
             });
         }
 

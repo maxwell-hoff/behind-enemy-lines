@@ -57,6 +57,10 @@ RIVER_SOUND_RANGE_FAR = 50   # Cells
 VEG_SOUND_RANGE_NEAR = 10    # Cells
 VEG_SOUND_RANGE_FAR = 30     # Cells
 
+# Enemy sound ranges
+ENEMY_SOUND_RANGE_MIN = 50  # Minimum range in cells
+ENEMY_SOUND_RANGE_MAX = 65  # Maximum range in cells
+
 def is_river(x, y):
     """
     Determines if the cell at (x, y) is part of the river.
@@ -304,9 +308,28 @@ def compute_sounds(center_x, center_y, terrain_type, previous_positions):
                     'color': 'green'
                 })
 
+    # 5. Enemy Sounds
+    for enemy in enemies:
+        dx = enemy['x'] - center_x
+        dy = enemy['y'] - center_y
+        distance = math.sqrt(dx**2 + dy**2)
+        if distance <= ENEMY_SOUND_RANGE_MAX:
+            # Compute intensity based on distance
+            if distance <= ENEMY_SOUND_RANGE_MIN:
+                intensity = 1.0  # Maximum intensity
+            else:
+                intensity = (ENEMY_SOUND_RANGE_MAX - distance) / (ENEMY_SOUND_RANGE_MAX - ENEMY_SOUND_RANGE_MIN)
+            # Convert intensity to color (red with varying opacity)
+            color = f'rgba(255, 0, 0, {intensity})'
+            sounds.append({
+                'x': dx,
+                'y': dy,
+                'color': color
+            })
+
     return sounds
 
-def compute_enemy_fov(enemy_x, enemy_y, enemy_direction, fov_angle=60, fov_range=10):
+def compute_enemy_fov(enemy_x, enemy_y, enemy_direction, fov_angle=60, fov_range=25):
     """
     Computes the cells within the enemy's field of vision cone.
     Returns a set of (dx, dy) tuples relative to the enemy's position.
@@ -558,10 +581,17 @@ def visible_cells():
             # Enemy not visible, do not include FOV and hearing ranges
             continue
 
+    # Get enemies from game state
+    enemies = game_state.get('enemies', [])
+
+    # Compute sounds, including enemies
+    sounds = compute_sounds(center_x, center_y, terrain_type, game_state.get('previous_positions', []), enemies)
+
     response = jsonify({
         'visible_cells': visible_cells,
         'previous_positions': relative_previous_positions,
-        'lobby_code': lobby_code
+        'lobby_code': lobby_code,
+        'sounds': sounds  # Include sounds in the response
     })
     response.set_cookie('session_id', session_id)
     return response
