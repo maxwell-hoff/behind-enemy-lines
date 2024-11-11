@@ -324,7 +324,7 @@ def compute_enemy_fov(enemy_x, enemy_y, enemy_direction, fov_angle=60, fov_range
             fov_cells.add((dx, dy))
     return fov_cells
 
-def compute_enemy_hearing(enemy_x, enemy_y, hearing_range=25):
+def compute_enemy_hearing(enemy_x, enemy_y, hearing_range=15):
     """
     Computes the cells within the enemy's hearing circle.
     Returns a set of (dx, dy) tuples relative to the enemy's position.
@@ -506,41 +506,7 @@ def visible_cells():
     center_y = position['y']
 
     # Use LOS visibility for "mountains" terrain
-    if terrain_type == TERRAIN_MOUNTAINS:
-        visible_cells = line_of_sight_visibility(center_x, center_y, terrain_type)
-    else:
-        # Existing visibility calculation (now fixed to mountains)
-        a_squares, b_squares, phi = get_visibility_range(center_x, center_y, terrain_type)
-
-        # Rotate the ellipse to align with the tilt direction
-        cos_phi = math.cos(phi)
-        sin_phi = math.sin(phi)
-
-        # Prepare visible cells
-        visible_cells = []
-
-        # Determine the grid boundaries
-        max_range = max(a_squares, b_squares, 10)
-        for y in range(center_y - max_range, center_y + max_range + 1):
-            for x in range(center_x - max_range, center_x + max_range + 1):
-                dx = x - center_x
-                dy = y - center_y
-
-                x_rot = dx * cos_phi + dy * sin_phi
-                y_rot = -dx * sin_phi + dy * cos_phi
-
-                if (x_rot / a_squares) ** 2 + (y_rot / b_squares) ** 2 <= 1:
-                    cell_elevation = terrain_height(x, y, terrain_type)
-                    cell_vegetation_height = vegetation_height(x, y, cell_elevation)
-                    cell_water = is_river(x, y) if terrain_type == TERRAIN_MOUNTAINS else False
-
-                    visible_cells.append({
-                        'x': dx,
-                        'y': dy,
-                        'elevation': cell_elevation,
-                        'vegetation_height': cell_vegetation_height,
-                        'water': cell_water  # Add water flag
-                    })
+    visible_cells = line_of_sight_visibility(center_x, center_y, terrain_type)
 
     # Prepare previous positions relative to the current position
     relative_previous_positions = []
@@ -549,11 +515,8 @@ def visible_cells():
         rel_y = pos['y'] - center_y
         relative_previous_positions.append({'x': rel_x, 'y': rel_y})
 
-    # Compute sounds
-    sounds = compute_sounds(center_x, center_y, terrain_type, game_state.get('previous_positions', []))
-
-    # Create a set for quick lookup
-    visible_cells_set = set((cell['x'], cell['y']) for cell in visible_cells)
+    # Create a set of visible positions for quick lookup
+    visible_positions = set((cell['x'], cell['y']) for cell in visible_cells)
 
     # Get enemies from game state
     enemies = game_state.get('enemies', [])
@@ -563,24 +526,37 @@ def visible_cells():
         enemy_y = enemy['y']
         enemy_direction = enemy['direction']
 
-        # Compute FOV and hearing ranges
-        fov_cells = compute_enemy_fov(enemy_x, enemy_y, enemy_direction)
-        hearing_cells = compute_enemy_hearing(enemy_x, enemy_y)
+        # Compute relative position of enemy
+        enemy_rel_x = enemy_x - center_x
+        enemy_rel_y = enemy_y - center_y
 
-        # Mark cells in visible_cells
-        for cell in visible_cells:
-            cell_x_global = cell['x'] + center_x
-            cell_y_global = cell['y'] + center_y
+        enemy_visible = (enemy_rel_x, enemy_rel_y) in visible_positions
 
-            dx_enemy = cell_x_global - enemy_x
-            dy_enemy = cell_y_global - enemy_y
+        if enemy_visible:
+            # Mark the enemy's position
+            for cell in visible_cells:
+                if cell['x'] == enemy_rel_x and cell['y'] == enemy_rel_y:
+                    cell['enemy'] = True
 
-            if (dx_enemy, dy_enemy) == (0, 0):
-                cell['enemy'] = True  # Enemy position
-            elif (dx_enemy, dy_enemy) in fov_cells:
-                cell['enemy_fov'] = True
-            elif (dx_enemy, dy_enemy) in hearing_cells:
-                cell['enemy_hearing'] = True
+            # Compute FOV and hearing ranges
+            fov_cells = compute_enemy_fov(enemy_x, enemy_y, enemy_direction)
+            hearing_cells = compute_enemy_hearing(enemy_x, enemy_y)
+
+            # Mark cells in visible_cells
+            for cell in visible_cells:
+                cell_x_global = cell['x'] + center_x
+                cell_y_global = cell['y'] + center_y
+
+                dx_enemy = cell_x_global - enemy_x
+                dy_enemy = cell_y_global - enemy_y
+
+                if (dx_enemy, dy_enemy) in fov_cells:
+                    cell['enemy_fov'] = True
+                elif (dx_enemy, dy_enemy) in hearing_cells:
+                    cell['enemy_hearing'] = True
+        else:
+            # Enemy not visible, do not include FOV and hearing ranges
+            continue
 
     response = jsonify({
         'visible_cells': visible_cells,

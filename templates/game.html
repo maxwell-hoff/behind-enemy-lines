@@ -191,7 +191,7 @@
 
                             if (x === 0 && y === 0) {
                                 cell.classList.add('center');
-                                cell.style.backgroundColor = 'orange';
+                                cell.style.backgroundColor = 'orange'; // Or change to 'blue'
                             } else if (previousPositionsSet.has(cellKey)) {
                                 cell.classList.add('previous');
                                 cell.style.backgroundColor = 'lightgrey';
@@ -221,9 +221,9 @@
                                     if (cellData.enemy) {
                                         cell.style.backgroundColor = 'red';
                                     } else if (cellData.enemy_fov) {
-                                        cell.style.backgroundColor = '#FFA07A'; // LightSalmon
+                                        cell.style.backgroundColor = 'rgba(255, 0, 0, 0.5)'; // Semi-transparent red
                                     } else if (cellData.enemy_hearing) {
-                                        cell.style.backgroundColor = '#FFC0CB'; // Pink
+                                        cell.style.backgroundColor = 'rgba(255, 165, 0, 0.5)'; // Semi-transparent orange
                                     } else {
                                         cell.style.backgroundColor = 'grey';
                                     }
