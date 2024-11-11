@@ -306,7 +306,7 @@ def compute_sounds(center_x, center_y, terrain_type, previous_positions):
 
     return sounds
 
-def compute_enemy_fov(enemy_x, enemy_y, enemy_direction, fov_angle=60, fov_range=50):
+def compute_enemy_fov(enemy_x, enemy_y, enemy_direction, fov_angle=60, fov_range=10):
     """
     Computes the cells within the enemy's field of vision cone.
     Returns a set of (dx, dy) tuples relative to the enemy's position.
@@ -324,7 +324,7 @@ def compute_enemy_fov(enemy_x, enemy_y, enemy_direction, fov_angle=60, fov_range
             fov_cells.add((dx, dy))
     return fov_cells
 
-def compute_enemy_hearing(enemy_x, enemy_y, hearing_range=100):
+def compute_enemy_hearing(enemy_x, enemy_y, hearing_range=25):
     """
     Computes the cells within the enemy's hearing circle.
     Returns a set of (dx, dy) tuples relative to the enemy's position.
