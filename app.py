@@ -399,8 +399,8 @@ def start_game():
     for _ in range(num_enemies):
         while True:
             # Generate random positions for enemies
-            enemy_x = random.randint(-50, 50)
-            enemy_y = random.randint(-50, 50)
+            enemy_x = random.randint(-10, 10)
+            enemy_y = random.randint(-10, 10)
             if not is_river(enemy_x, enemy_y):
                 break
         # Assign random direction for enemy's field of vision (in degrees)
